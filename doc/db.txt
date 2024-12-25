@@ -1,63 +1,13 @@
-docker run --name equiledger -e POSTGRES_PASSWORD=7iron-hide -d postgres
-docker exec -it equiledger psql -U postgres
-
-CREATE TABLE public.expenses (
-    id                SERIAL PRIMARY KEY,
-    user_id           INTEGER NOT NULL,
-    title             VARCHAR(255) NOT NULL,
-    description       TEXT,
-    category          VARCHAR(50) NOT NULL,
-    amount            NUMERIC(10,2) NOT NULL,
-    currency          VARCHAR(10) NOT NULL DEFAULT 'EUR',
-    receipt_image_url VARCHAR(255),
-    created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT expenses_user_id_fkey FOREIGN KEY (user_id)
-    REFERENCES public.users (id) ON DELETE CASCADE
-);
-
-CREATE TABLE public.users (
-    id              SERIAL PRIMARY KEY,
-    fname           VARCHAR(255) NOT NULL,
-    mname           VARCHAR(255),
-    sname           VARCHAR(255) NOT NULL,
-    email           VARCHAR(255) NOT NULL UNIQUE,
-    phone_number    VARCHAR(50),
-    date_of_birth   DATE NOT NULL,
-    ppsno           VARCHAR(50),
-    id_image_url VARCHAR(255),
-    currency        VARCHAR(10) DEFAULT 'EUR',
-    address_line1   VARCHAR(255),
-    address_line2   VARCHAR(255),
-    city            VARCHAR(100),
-    state           VARCHAR(100),
-    country         VARCHAR(100),
-    tax_status      VARCHAR(50),
-    marital_status  VARCHAR(50),
-    postal_code     VARCHAR(20),
-    occupation      VARCHAR(100),
-    password_hash   VARCHAR(255) NOT NULL,
-    role            VARCHAR(50) DEFAULT 'client'::character varying,
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    subscription_level  VARCHAR(50) DEFAULT 'free',
-    account_status      VARCHAR(50) DEFAULT 'active',
-    last_login          TIMESTAMP,
-    is_auto_renew       BOOLEAN DEFAULT TRUE,
-    payment_method      VARCHAR(50),
-    renewal_date        TIMESTAMP,
-    CONSTRAINT unique_email UNIQUE (email)
-);
-
-curl -X POST https://equiledger-production.up.railway.app/users \
--H "Content-Type: application/json" \
--d '{
-  "name": "Mary Kane",
-  "email": "marykane0@gmail.com",
-  "password": "7iron-hide",
-  "role": "client"
-}'
-
+./startup
+docker cp initdb.sql equiledger_db:initdb.sql 
+docker exec -it equiledger_db psql -U testuser -d equiledger -f /initdb.sql
+docker run --name equiledger_db \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=admin \
+  -e POSTGRES_DB=equiledger \
+  -p 5433:5432 \
+  -d postgres:15
+  
 curl -X POST http://localhost:3000/expenses \
 -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjExLCJyb2xlIjoiY2xpZW50IiwiaWF0IjoxNzI0NTMxODU0LCJleHAiOjE3MjUxMzY2NTR9.PtdIG9PL3aR5zrMGCBwBvJT_hT2j8N4NQ_Q6yVUbqoo" \
 -F "title=Horse Feed" \
@@ -67,9 +17,7 @@ curl -X POST http://localhost:3000/expenses \
 -F "currency=EUR" \
 -F "receipt_image=@ls.jpg"
 
-
 curl -X POST http://localhost:3000/users -H "Content-Type: application/json" -d '{"fname": "Louis", "sname": "Sullivan", "email": "admin@gmail.com", "password": "admin", "role": "admin", "date_of_birth": "16-05-2001"}'
-
 
 curl -X POST http://localhost:3000/users/login -H "Content-Type: application/json" -d '{"email": "admin@gmail.com", "password": "admin"}'
 

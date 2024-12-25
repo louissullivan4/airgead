@@ -14,7 +14,6 @@ const logger = createLogger({
                 log += ` ${JSON.stringify(meta)}`;
             }
 
-            // Apply kleur to the entire log message based on the level
             switch (level) {
                 case 'error':
                     return kleur.red(log);

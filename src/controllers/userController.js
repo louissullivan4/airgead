@@ -5,11 +5,48 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 const userModel = require('../models/userModel');
 const logger = require('../utils/logger');
+const { uploadBase64Image } = require('../middlewares/imageUpload');
+const moment = require('moment');
+const { v4: uuidv4 } = require('uuid');
 
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
 
 const createUser = async (req, res) => {
+    try {
+        const token = extractToken(req);
+        if (!token) {
+            logger.error('Missing token for user creation.');
+            return res.status(401).json({ error: 'Authentication token is required.' });
+        }
+
+        const userData = extractCreateUserData(req);
+
+        await userModel.isEmailUnique(req.pool, userData.email);
+
+        uploadBase64Image(req, res, async (err) => {
+            if (err) {
+                logger.error('Image upload error: %s', err.message);
+                return res.status(400).json({ error: err.message });
+            }
+
+            userData.password = await hashPassword(userData.password);
+            userData.id_image_url = req.body.image;
+
+            const newUser = await userModel.createUser(req.pool, userData);
+
+            const newToken = generateJwtToken(newUser);
+
+            logger.info('User created successfully: %s', newUser.email);
+            res.status(201).json(formatUserResponse(newUser, newToken));
+        });
+    } catch (error) {
+        logger.error('Error creating user: %s', error);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+function extractCreateUserData(req) {
     const {
         fname,
         mname,
@@ -18,101 +55,62 @@ const createUser = async (req, res) => {
         phone_number,
         date_of_birth,
         ppsno,
-        id_image_url,
-        currency,
         address_line1,
         address_line2,
         city,
-        state,
+        county,
         country,
         tax_status,
         marital_status,
         postal_code,
         occupation,
+        currency,
         password,
-        role,
-        subscription_level,
-        account_status,
-        last_login,
-        is_auto_renew,
-        payment_method,
-        renewal_date
+        inviter_id,
+        image
     } = req.body;
 
-    if (!fname || !sname || !email || !password || !date_of_birth) {
-        logger.warn('Missing required fields for creating user: %o', req.body);
-        return res.status(400).json({ error: 'First name, surname, email, password, and date of birth are required.' });
+    return {
+        fname,
+        mname,
+        sname,
+        email,
+        phone_number,
+        date_of_birth,
+        ppsno,
+        address_line1,
+        address_line2,
+        city,
+        county,
+        country,
+        tax_status,
+        marital_status,
+        postal_code,
+        occupation,
+        currency,
+        password,
+        inviter_id,
+        image,
+        id_image_url : null,
+        filename: `${uuidv4}_${fname.toLowerCase()}_${sname.toLowerCase()}_${moment().format('YYYY-MM-DD')}_id`,
     }
+}
 
-    try {
-        const existingUser = await userModel.getUserByEmail(req.pool, email);
-        if (existingUser) {
-            logger.warn('Attempt to create a user with an existing email: %s', email);
-            return res.status(400).json({ error: 'User with this email already exists.' });
-        }
+function formatUserResponse(user, token) {
+    return {
+        id: user.id,
+        fname: user.fname,
+        sname: user.sname,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at,
+        token: token,
+    };
+}
 
-        const user = {
-            fname,
-            mname,
-            sname,
-            email,
-            phone_number,
-            date_of_birth,
-            ppsno,
-            id_image_url,
-            currency,
-            address_line1,
-            address_line2,
-            city,
-            state,
-            country,
-            tax_status,
-            marital_status,
-            postal_code,
-            occupation,
-            password,
-            role: role || 'client',
-            subscription_level: subscription_level || 'free',
-            account_status: account_status || 'active',
-            last_login: last_login || null,
-            is_auto_renew: is_auto_renew !== undefined ? is_auto_renew : true,
-            payment_method,
-            renewal_date,
-        };
-
-        const newUser = await userModel.createUser(req.pool, user);
-        const token = jwt.sign({ userId: newUser.id, role: newUser.role }, jwtSecret, { expiresIn: '168h' });
-
-        logger.info('User created successfully: %s', email);
-        res.status(201).json({
-            id: newUser.id,
-            fname: newUser.fname,
-            sname: newUser.sname,
-            email: newUser.email,
-            role: newUser.role,
-            created_at: newUser.created_at,
-            token,
-        });
-    } catch (error) {
-        logger.error('Error creating user: %s', error.message);
-        res.status(500).json({ error: 'Internal server error.' });
-    }
-};
-
-const getAllUsers = async (req, res) => {
-    try {
-        const allUsers = { all_users: await userModel.getAllUsers(req.pool) };
-        logger.info('Fetched all users.');
-        res.status(200).json(allUsers);
-    } catch (error) {
-        logger.error('Error fetching users: %s', error.message);
-        res.status(500).json({ error: 'Internal server error.' });
-    }
-};
 
 const getUser = async (req, res) => {
     const { id } = req.params;
-
     try {
         const user = await userModel.getUserById(req.pool, id);
         if (!user) {
@@ -448,21 +446,25 @@ const resetPassword = async (req, res) => {
 };
 
 const inviteUser = async (req, res) => {
-    const { email } = req.body;
+    const { email, inviterId } = req.body;
 
     if (!email) {
-        logger.warn('Email is required for inviting a user.');
+        logger.error('Email is required for inviting a user.');
         return res.status(400).json({ error: 'Email is required.' });
     }
 
     try {
         const existingUser = await userModel.getUserByEmail(req.pool, email);
         if (existingUser) {
-            logger.warn('Invite attempted for existing user: %s', email);
+            logger.error('Invite attempted for existing user: %s', email);
             return res.status(400).json({ error: 'User with this email already exists.' });
         }
 
-        const inviteToken = jwt.sign({ email }, jwtSecret, { expiresIn: '168h' });
+        const inviteToken = jwt.sign(
+            { email, inviter_id: inviterId },
+            jwtSecret,
+            { expiresIn: '168h' }
+        );
 
         const inviteLink = `${frontendURL}/signup?token=${inviteToken}`;
 
@@ -472,10 +474,10 @@ const inviteUser = async (req, res) => {
             port: 465,
             secure: true,
             auth: {
-              user: process.env.EMAIL_USERNAME,
-              pass: process.env.EMAIL_PASSWORD,
+                user: process.env.EMAIL_USERNAME,
+                pass: process.env.EMAIL_PASSWORD,
             },
-          });
+        });
 
         const mailOptions = {
             from: process.env.EMAIL_USERNAME,
@@ -500,6 +502,29 @@ const inviteUser = async (req, res) => {
     }
 };
 
+const getAllUsers = async (req, res) => {
+    try {
+        const allUsers = { all_users: await userModel.getAllUsers(req.pool) };
+        logger.info('Fetched all users.');
+        res.status(200).json(allUsers);
+    } catch (error) {
+        logger.error('Error fetching users: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+const getAssignedUsers = async (req, res) => {
+    const currentUserId = req.user.userId;
+    try {
+        const assignedUsers = await userModel.getUsersByInviterId(req.pool, currentUserId);
+        logger.info('Fetched assigned users for accountant: %s', currentUserId);
+        res.status(200).json(assignedUsers);
+    } catch (error) {
+        logger.error('Error fetching assigned users: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     createUser,
     getAllUsers,
@@ -512,5 +537,33 @@ module.exports = {
     resetPassword,
     requestPasswordReset,
     inviteUser,
-    dashboardLogin
+    dashboardLogin,
+    getAssignedUsers
 };
+
+function extractToken(req) {
+    const authHeader = req.headers.authorization;
+    let token = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    }
+
+    if (!token && req.query.token) {
+        token = req.query.token;
+    }
+
+    return token;
+}
+
+function generateJwtToken(user) {
+    return jwt.sign(
+        { userId: user.id, role: user.role },
+        jwtSecret,
+        { expiresIn: '168h' }
+    );
+}
+
+async function hashPassword(password) {
+    return await bcrypt.hash(password, 10);
+}

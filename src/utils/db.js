@@ -1,18 +1,18 @@
 const { Pool } = require('pg');
+const logger = require('../utils/logger');
 require('dotenv').config();
 
-// const connectionString = process.env.DATABASE_URL;
-
-// const pool = new Pool({
-//     connectionString
-// });
-
 const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
+    connectionString: process.env.DATABASE_URL,
+});
+
+pool.on('connect', () => {
+    logger.info('Connected to the database');
+});
+
+pool.on('error', (err) => {
+    logger.error('Unexpected error on idle client', err);
+    process.exit(-1);
 });
 
 module.exports = pool;

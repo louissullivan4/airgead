@@ -1,4 +1,4 @@
-const app = require('./index'); // Import the app without starting the server
+const app = require('./index');
 const logger = require('./utils/logger');
 
 const port = process.env.PORT || 3000;

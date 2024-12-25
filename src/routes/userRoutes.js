@@ -7,6 +7,8 @@ router.post('/', userController.createUser);
 
 router.get('/', authenticateToken, authoriseRole(['admin', 'accountant']), userController.getAllUsers);
 
+router.get('/accountant/users', authenticateToken, authoriseRole(['admin', 'accountant']), userController.getAssignedUsers);
+
 router.get('/:id', authenticateToken, userController.getUser);
 
 router.get('/email/:email', authenticateToken, userController.getUserByEmail);

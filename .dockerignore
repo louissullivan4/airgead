@@ -4,3 +4,4 @@ Dockerfile
 docker-compose.yml
 .git
 .gitignore
+sa-key.json

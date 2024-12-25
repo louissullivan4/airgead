@@ -16,8 +16,5 @@ COPY . .
 # Expose the application port
 EXPOSE 3000
 
-# Define environment variables (optional)
-# ENV NODE_ENV=production
-
 # Start the application
 CMD ["npm", "start"]

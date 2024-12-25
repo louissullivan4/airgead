@@ -1,4 +1,4 @@
-const pool = require('../utils/db'); // Adjust the path to your db configuration
+const pool = require('../utils/db');
 
 const injectPool = (req, res, next) => {
     req.pool = pool;

@@ -1,4 +1,3 @@
-const bcrypt = require('bcrypt');
 const logger = require('../utils/logger');
 
 const createUser = async (pool, user) => {
@@ -10,45 +9,55 @@ const createUser = async (pool, user) => {
         phone_number,
         date_of_birth,
         ppsno,
-        id_image_url,
-        currency,
         address_line1,
         address_line2,
         city,
-        state,
+        county,
         country,
         tax_status,
         marital_status,
         postal_code,
         occupation,
+        currency,
         password,
-        role,
-        subscription_level,
-        account_status,
-        last_login,
-        is_auto_renew,
-        payment_method,
-        renewal_date
+        inviter_id,
+        id_image_url,
     } = user;
 
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const result = await pool.query(
-            `INSERT INTO users (
-                fname, mname, sname, email, phone_number, date_of_birth, ppsno, id_image_url, currency,
-                address_line1, address_line2, city, state, country, tax_status, marital_status,
-                postal_code, occupation, password_hash, role, subscription_level, account_status,
-                last_login, is_auto_renew, payment_method, renewal_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                $18, $19, $20, $21, $22, $23, $24, $25)
-            RETURNING *`,
-            [
-                fname, mname, sname, email, phone_number, date_of_birth, ppsno, id_image_url, currency,
-                address_line1, address_line2, city, state, country, tax_status, marital_status,
-                postal_code, occupation, hashedPassword, role, subscription_level, account_status,
-                last_login, is_auto_renew, payment_method, renewal_date
-            ]
-        );
+        const insertQuery = `
+            INSERT INTO users (
+                fname, mname, sname, email, phone_number, date_of_birth, ppsno, address_line1, address_line2, city, county, country, tax_status, marital_status, postal_code, occupation, currency, password_hash, inviter_id, id_image_url
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+            )
+            RETURNING *
+        `;
+
+        const values = [
+            fname,
+            mname || '',
+            sname,
+            email,
+            phone_number,
+            date_of_birth,
+            ppsno,
+            address_line1,
+            address_line2 || '',
+            city,
+            county || '',
+            country,
+            tax_status,
+            marital_status,
+            postal_code || '',
+            occupation,
+            currency,
+            password,
+            inviter_id,
+            id_image_url,
+        ];
+
+        const result = await pool.query(insertQuery, values);
         logger.info('User created successfully', { email });
         return result.rows[0];
     } catch (error) {
@@ -185,6 +194,17 @@ const saveInviteToken = async (pool, email, token) => {
     }
 };
 
+const getUsersByInviterId = async (pool, inviterId) => {
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE inviter_id = $1', [inviterId]);
+        logger.info('Fetched users assigned to inviter_id: %s', inviterId);
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching users by inviter_id: %s', error.message);
+        throw error;
+    }
+};
+
 module.exports = {
     createUser,
     getAllUsers,
@@ -194,5 +214,6 @@ module.exports = {
     updateUserByEmail,
     updateUserPassword,
     deleteUserByEmail,
-    saveInviteToken
+    saveInviteToken,
+    getUsersByInviterId
 };

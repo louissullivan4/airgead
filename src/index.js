@@ -5,9 +5,13 @@ const path = require('path');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 require('dotenv').config();
 
 const app = express();
+
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(cors({
     origin: 'http://localhost:3001',
@@ -31,9 +35,8 @@ app.get('/', (req, res) => {
 app.use('/users', userRoutes);
 app.use('/expenses', expenseRoutes);
 
-// Global error handler
 app.use((err, req, res, next) => {
-    logger.error('Unhandled error: %s', err.message);
+    logger.error('Unhandled error: ', err);
     res.status(500).json({ error: 'Internal server error.' });
 });
 

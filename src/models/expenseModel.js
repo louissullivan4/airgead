@@ -1,4 +1,3 @@
-// expenseModel.js
 const logger = require('../utils/logger');
 
 const createExpense = async (pool, expense) => {
@@ -54,6 +53,30 @@ const getExpenseByCategory = async (pool, id, category) => {
     }
 };
 
+
+const getExpensesByUserIdAndYear = async (pool, user_id, year) => {
+    try {
+        const startDate = `${year}-01-01`;
+        const endDate = `${parseInt(year) + 1}-01-01`;
+
+        const query = `
+            SELECT *
+            FROM expenses
+            WHERE user_id = $1
+              AND created_at >= $2
+              AND created_at < $3
+        `;
+        const values = [user_id, startDate, endDate];
+        const result = await pool.query(query, values);
+        logger.info('Fetched expenses for user', { user_id, year });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching expenses by user ID and year', { user_id, year, error: error.message });
+        throw error;
+    }
+};
+
+
 const updateExpense = async (pool, id, expense) => {
     try {
         const { title, description, category, amount, currency, receipt_image_url } = expense;
@@ -95,4 +118,5 @@ module.exports = {
     getExpenseById,
     updateExpense,
     deleteExpense,
+    getExpensesByUserIdAndYear
 };

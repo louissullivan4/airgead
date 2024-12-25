@@ -8,7 +8,10 @@ const router = express.Router();
 router.use(injectPool);
 
 router.get('/', authenticateToken, expenseController.getExpenses);
+router.get('/users/:id', authenticateToken, expenseController.getExpensesByUserId);
 router.get('/:id', authenticateToken, expenseController.getExpenseById);
+router.get('/users/:id/:year', authenticateToken, expenseController.getExpensesByUserIdAndYear);
+router.get('/downloads/:id/:year', authenticateToken, expenseController.getExcelDownloadByUserIdAndYear);
 router.post('/', authenticateToken, expenseController.createExpense);
 router.put('/:id', authenticateToken, expenseController.updateExpense);
 router.delete('/:id', authenticateToken, expenseController.deleteExpense);

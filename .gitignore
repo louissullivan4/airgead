@@ -8,3 +8,6 @@ send.sh
 ls.jpeg
 README.md
 logs/
+sa-key.json
+.vscode/
+src/temp/
