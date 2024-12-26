@@ -3,11 +3,11 @@ const logger = require('../utils/logger');
 require('dotenv').config();
 
 const pool = new Pool({
-    host: process.env.INSTANCE_UNIX_SOCKET,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    // connectionString: process.env.DATABASE_URL, //LOCAL UNCOMMENT
+    // host: process.env.INSTANCE_UNIX_SOCKET,
+    // user: process.env.DB_USER,
+    // password: process.env.DB_PASS,
+    // database: process.env.DB_NAME,
+    connectionString: process.env.DB_URL,
 });
 
 pool.on('connect', () => {
