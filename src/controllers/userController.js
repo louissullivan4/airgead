@@ -289,10 +289,15 @@ const login = async (req, res) => {
 
         const token = jwt.sign({ userId: user.id, role: user.role }, jwtSecret, { expiresIn: '168h' });
 
-        logger.info('User logged in successfully: %s', email);
+        logger.info('User logged in successfully: ', {
+            id: user.id,
+            name: user.fname,
+            email: user.email,
+            role: user.role,
+        });
         res.status(200).json({
             id: user.id,
-            name: user.name,
+            name: user.fname,
             email: user.email,
             role: user.role,
             token,
