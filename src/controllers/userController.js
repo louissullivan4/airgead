@@ -8,13 +8,14 @@ const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
+const gf = require('../utils/gf');
 
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
 
 const createUser = async (req, res) => {
     try {
-        const token = extractToken(req);
+        const token = gf.extractToken(req);
         if (!token) {
             logger.error('Missing token for user creation.');
             return res.status(401).json({ error: 'Authentication token is required.' });
@@ -30,12 +31,12 @@ const createUser = async (req, res) => {
                 return res.status(400).json({ error: err.message });
             }
 
-            userData.password = await hashPassword(userData.password);
+            userData.password = await gf.hashPassword(userData.password);
             userData.id_image_url = req.body.image;
 
             const newUser = await userModel.createUser(req.pool, userData);
 
-            const newToken = generateJwtToken(newUser);
+            const newToken = gf.generateJwtToken(newUser);
 
             logger.info('User created successfully: %s', newUser.email);
             res.status(201).json(formatUserResponse(newUser, newToken));
@@ -143,95 +144,24 @@ const getUserByEmail = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-    const { email } = req.params;
-    const {
-        fname,
-        mname,
-        sname,
-        phone_number,
-        date_of_birth,
-        ppsno,
-        id_image_url,
-        currency,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        country,
-        tax_status,
-        marital_status,
-        postal_code,
-        occupation,
-        role,
-        subscription_level,
-        account_status,
-        is_auto_renew,
-        payment_method,
-        renewal_date
-    } = req.body;
-    const currentUserId = req.user.userId;
-
-    if (!email) {
-        logger.warn('Missing current email for updating user.');
-        return res.status(400).json({ error: 'Current email is required.' });
-    }
-
+    const { id } = req.params;
+    const updateFields = req.body; 
+  
     try {
-        const userToUpdate = await userModel.getUserByEmail(req.pool, email);
-        if (!userToUpdate) {
-            logger.warn('User not found for update with email: %s', email);
-            return res.status(404).json({ error: 'User not found.' });
-        }
-
-        const currentUser = await userModel.getUserById(req.pool, currentUserId);
-
-        if (currentUser.email !== email || !['admin', 'accountant'].includes(currentUser.role)) {
-            logger.warn('Unauthorized update attempt by user: %s for user email: %s', currentUser.email, email);
-            return res.status(403).json({ error: 'Access denied. You do not have the required permissions.' });
-        }
-
-        const updateFields = {
-            fname,
-            mname,
-            sname,
-            phone_number,
-            date_of_birth,
-            ppsno,
-            id_image_url,
-            currency,
-            address_line1,
-            address_line2,
-            city,
-            state,
-            country,
-            tax_status,
-            marital_status,
-            postal_code,
-            occupation,
-            role,
-            subscription_level,
-            account_status,
-            is_auto_renew,
-            payment_method,
-            renewal_date
-        };
-
-        const updatedUser = await userModel.updateUserByEmail(req.pool, email, updateFields);
-
-        logger.info('User updated successfully: %s', email);
-        res.status(200).json({
-            id: updatedUser.id,
-            fname: updatedUser.fname,
-            sname: updatedUser.sname,
-            email: updatedUser.email,
-            role: updatedUser.role,
-            updated_at: updatedUser.updated_at,
-        });
+      const updatedUser = await userModel.updateUserById(req.pool, id, updateFields);
+  
+      if (!updatedUser) {
+        logger.warn('User not found with ID: %s', id);
+        return res.status(404).json({ error: 'User not found.' });
+      }
+  
+      logger.info('Updated user with ID: %s', id);
+      return res.status(200).json(updatedUser);
     } catch (error) {
-        logger.error('Error updating user: %s', error.message);
-        res.status(500).json({ error: 'Internal server error.' });
+      logger.error('Error updating user: %s', error.message);
+      return res.status(500).json({ error: 'Internal server error.' });
     }
-};
+  };
 
 const deleteUser = async (req, res) => {
     const { email } = req.params;
@@ -275,7 +205,7 @@ const login = async (req, res) => {
     }
 
     try {
-        const user = await userModel.getUserByEmail(req.pool, email);
+        const user = await userModel.getUserPasswordByEmail(req.pool, email);
         if (!user) {
             logger.warn('Invalid login attempt for email: %s', email);
             return res.status(401).json({ error: 'Invalid email or password.' });
@@ -545,30 +475,3 @@ module.exports = {
     dashboardLogin,
     getAssignedUsers
 };
-
-function extractToken(req) {
-    const authHeader = req.headers.authorization;
-    let token = null;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.split(' ')[1];
-    }
-
-    if (!token && req.query.token) {
-        token = req.query.token;
-    }
-
-    return token;
-}
-
-function generateJwtToken(user) {
-    return jwt.sign(
-        { userId: user.id, role: user.role },
-        jwtSecret,
-        { expiresIn: '168h' }
-    );
-}
-
-async function hashPassword(password) {
-    return await bcrypt.hash(password, 10);
-}

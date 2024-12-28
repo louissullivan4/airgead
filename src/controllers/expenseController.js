@@ -1,58 +1,64 @@
 const expenseModel = require('../models/expenseModel');
 const logger = require('../utils/logger');
-const { uploadFile, uploadToCloudinary } = require('../middlewares/imageUpload');
+const { uploadBase64Image } = require('../middlewares/imageUpload');
 const { downloadImages, createZipArchive } = require('../middlewares/imageDownload');
-const ExcelJS = require('exceljs');
 const fs = require('fs-extra');
 const path = require('path');
+const gf = require('../utils/gf');
 
 const createExpense = async (req, res) => {
-    uploadFile('receipt_image')(req, res, async (err) => {
-        if (err) {
-            logger.error('Image upload error: %s', err.message);
-            return res.status(400).json({ error: err.message });
+    try {
+        const token = gf.extractToken(req);
+        if (!token) {
+            logger.error('Missing token for expense creation.');
+            return res.status(401).json({ error: 'Authentication token is required.' });
         }
 
-        if (req.file) {
-            uploadToCloudinary(req, res, async (cloudinaryErr) => {
-                if (cloudinaryErr) {
-                    return res.status(500).json({ error: cloudinaryErr.message });
-                }
-                await proceedWithExpenseCreation(req, res);
-            });
-        } else {
-            await proceedWithExpenseCreation(req, res);
-        }
-    });
+        const expenseData = extractExpenseData(req);
+
+        await uploadBase64Image(req, res, async (err) => {
+            if (err) {
+                logger.error('Image upload error: %s', err.message);
+                return res.status(400).json({ error: err.message });
+            }
+
+            expenseData.receipt_image_url = req.body.image;
+
+            const newExpense = await expenseModel.createExpense(req.pool, expenseData);
+            logger.info('Expense created successfully', newExpense);
+            res.status(201).json(newExpense);
+        });
+    } catch (error) {
+        logger.error('Database error while creating expense', error);
+        res.status(500).json({ error: 'Failed to save expense to database.' });
+    }
 };
 
-async function proceedWithExpenseCreation(req, res) {
+function extractExpenseData(req, res) {
     const user_id = (req.user ? req.user.userId : '').toString();
-    const { title, description, category, amount, currency } = req.body;
-    const receipt_image_url = req.file ? req.file.path : null;
+    const {
+        title,
+        description,
+        category,
+        amount,
+        currency,
+        image
+    } = req.body;
 
     if (!user_id || !title || !category || !amount || !currency) {
         logger.warn('Invalid input data for creating expense: %o', req.body);
-        return res.status(400).json({ error: 'User ID, Title, category, amount, and currency are required.' });
+        return res.status(400).json({ error: 'User ID, Title, category, amount and currency are required.' });
     }
 
-    const newExpense = {
+    return {
         user_id,
         title,
         description,
         category,
         amount,
         currency,
-        receipt_image_url,
-    };
-
-    try {
-        const newExpenseAdded = await expenseModel.createExpense(req.pool, newExpense);
-        logger.info('Expense created successfully: %o', newExpenseAdded);
-        res.status(201).json(newExpenseAdded);
-    } catch (dbErr) {
-        logger.error('Database error while creating expense: %s', dbErr.message);
-        res.status(500).json({ error: 'Failed to save expense to database.' });
+        image,
+        receipt_image_url: null
     }
 }
 
@@ -70,7 +76,6 @@ const getExpenses = async (req, res) => {
             expenses = await expenseModel.getExpensesByUserId(pool, user_id);
             logger.info('Expenses fetched for user: %s', user_id);
         }
-
         res.status(200).json(expenses);
     } catch (error) {
         logger.error('Error fetching expenses: %s', error.message);
@@ -84,6 +89,25 @@ const getExpensesByUserId = async (req, res) => {
         const id = req.params.id;
         if (id) {
             const expenses = await expenseModel.getExpensesByUserId(pool, id);
+            logger.info('Expenses fetched for user: %s', id);
+            res.status(200).json(expenses);
+        } else {
+            logger.error('User ID is required.');
+            res.status(401).json({ error: 'User ID is required.' });
+        }
+    } catch (error) {
+        logger.error('Error fetching expenses: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+
+const getExpensesByUserIdNoIncome = async (req, res) => {
+    try {
+        const pool = req.pool;
+        const id = req.params.id;
+        if (id) {
+            const expenses = await expenseModel.getExpensesByUserIdNoIncome(pool, id);
             logger.info('Expenses fetched for user: %s', id);
             res.status(200).json(expenses);
         } else {
@@ -181,6 +205,37 @@ const updateExpense = async (req, res) => {
     }
 };
 
+const partialUpdateExpense = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const token = gf.extractToken(req);
+        if (!token) {
+            logger.error('Missing token for expense creation.');
+            return res.status(401).json({ error: 'Authentication token is required.' });
+        }
+
+        const expenseData = extractExpenseData(req);
+        if (expenseData.image != null) {
+            await uploadBase64Image(req, res, async (err) => {
+                if (err) {
+                    logger.error('Image upload error: %s', err.message);
+                    return res.status(400).json({ error: err.message });
+                }
+                const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, true);
+                logger.info('Expense updated successfully', newExpense);
+                res.status(201).json(newExpense);
+            });
+        } else {
+            const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, false);
+            logger.info('Expense updated successfully', newExpense);
+            res.status(201).json(newExpense);
+        }
+    } catch (error) {
+        logger.error('Database error while creating expense', error);
+        res.status(500).json({ error: 'Failed to save expense to database.' });
+    }
+};
+
 const deleteExpense = async (req, res) => {
     try {
         const pool = req.pool;
@@ -230,7 +285,7 @@ const getExcelDownloadByUserIdAndYear = async (req, res) => {
 
         await downloadImages(expenses, imagesDir);
 
-        await generateExcel(expenses, imagesDir, excelFilePath);
+        await gf.generateExcel(expenses, imagesDir, excelFilePath);
 
         await createZipArchive([excelFilePath, imagesDir], zipFilePath);
 
@@ -258,62 +313,7 @@ module.exports = {
     deleteExpense,
     getExpensesByUserIdAndYear,
     getExpensesByUserId,
-    getExcelDownloadByUserIdAndYear
-};
-
-const generateExcel = async (expenses, imagesDir, filePath) => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Expenses');
-
-    worksheet.columns = [
-        { header: 'ID', key: 'id', width: 10 },
-        { header: 'Title', key: 'title', width: 30 },
-        { header: 'Description', key: 'description', width: 50 },
-        { header: 'Category', key: 'category', width: 20 },
-        { header: 'Amount', key: 'amount', width: 15 },
-        { header: 'Currency', key: 'currency', width: 10 },
-        { header: 'Date', key: 'date', width: 15 },
-        { header: 'Receipt Image URL', key: 'receipt_image_url', width: 15 },
-        { header: 'Receipt Image', key: 'receipt_image', width: 20 },
-    ];
-
-    worksheet.getRow(1).font = { bold: true };
-
-    expenses.forEach(expense => {
-        worksheet.addRow({
-            id: expense.id,
-            title: expense.title,
-            description: expense.description,
-            category: expense.category,
-            amount: expense.amount,
-            currency: expense.currency,
-            date: expense.created_at,
-            receipt_image_url: expense.receipt_image_url,
-            receipt_image: '',
-        });
-    });
-
-    expenses.forEach((expense, index) => {
-        if (expense.local_image_path) {
-            const imageId = workbook.addImage({
-                filename: expense.local_image_path,
-                extension: path.extname(expense.local_image_path).substring(1),
-            });
-
-            const rowNumber = index + 2;
-            const columnNumber = 9;
-
-            worksheet.addImage(imageId, {
-                tl: { col: columnNumber - 1, row: rowNumber - 1 },
-                ext: { width: 100, height: 100 },
-                editAs: 'oneCell',
-            });
-
-            worksheet.getRow(rowNumber).height = 80;
-        }
-    });
-
-    worksheet.getColumn(8).width = 20;
-
-    await workbook.xlsx.writeFile(filePath);
+    getExcelDownloadByUserIdAndYear,
+    partialUpdateExpense,
+    getExpensesByUserIdNoIncome
 };

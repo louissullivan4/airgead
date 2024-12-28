@@ -10,14 +10,25 @@ const createExpense = async (pool, expense) => {
         logger.info('Expense created successfully', { user_id, title });
         return result.rows[0];
     } catch (error) {
-        logger.error('Error creating expense', { user_id: expense.user_id, error: error.message });
+        logger.error('Error creating expense', { user_id: expense.user_id, error: error });
         throw error;
     }
 };
 
-const getExpensesByUserId = async (pool, user_id) => {
+const getExpensesByUserIdNoIncome = async (pool, user_id) => {
     try {
-        const result = await pool.query("SELECT * FROM expenses WHERE user_id = $1 AND category != 'income'", [user_id]);
+        const result = await pool.query("SELECT * FROM expenses WHERE user_id = $1 AND category != 'income' ORDER BY updated_at DESC", [user_id]);
+        logger.info('Fetched expenses for user', { user_id });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching expenses by user ID', { user_id, error: error.message });
+        throw error;
+    }
+};
+
+const getExpensesByUserId= async (pool, user_id) => {
+    try {
+        const result = await pool.query("SELECT * FROM expenses WHERE user_id = $1 ORDER BY updated_at DESC", [user_id]);
         logger.info('Fetched expenses for user', { user_id });
         return result.rows;
     } catch (error) {
@@ -97,6 +108,31 @@ const updateExpense = async (pool, id, expense) => {
     }
 };
 
+const partialUpdateExpense = async (pool, id, expense, updateImage) => {
+    try {
+        const { user_id, title, description, category, amount, currency, receipt_image_url } = expense;
+        console.log({ user_id, title, description, category, amount, currency, receipt_image_url });
+        if (!updateImage) {
+            const result = await pool.query(
+                'UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *',
+                [title, description, category, amount, currency, id]
+            );
+            return result.rows[0];
+        } else {
+            console.log('updating image');
+            const result = await pool.query(
+                'UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING *',
+                [title, description, category, amount, currency, receipt_image_url, id]
+            );
+            return result.rows[0];
+        }
+    } catch (error) {
+        logger.error('Error updating expense', { user_id: expense.user_id, error: error });
+        throw error;
+    }
+};
+
+
 const deleteExpense = async (pool, id) => {
     try {
         const result = await pool.query('DELETE FROM expenses WHERE id = $1', [id]);
@@ -118,5 +154,7 @@ module.exports = {
     getExpenseById,
     updateExpense,
     deleteExpense,
-    getExpensesByUserIdAndYear
+    getExpensesByUserIdAndYear,
+    getExpensesByUserIdNoIncome,
+    partialUpdateExpense
 };

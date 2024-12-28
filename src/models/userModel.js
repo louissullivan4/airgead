@@ -79,7 +79,64 @@ const getAllUsers = async (pool) => {
 
 const getUserByEmail = async (pool, email) => {
     try {
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const result = await pool.query(
+            `SELECT 
+              account_status, 
+              address_line1, 
+              address_line2, 
+              city, 
+              country, 
+              county, 
+              created_at, 
+              currency, 
+              date_of_birth, 
+              email, 
+              fname, 
+              id, 
+              id_image_url, 
+              inviter_id, 
+              is_auto_renew, 
+              last_login, 
+              marital_status, 
+              mname, 
+              occupation, 
+              payment_method, 
+              phone_number, 
+              poa_image_url, 
+              postal_code, 
+              ppsno, 
+              renewal_date, 
+              role, 
+              sname, 
+              subscription_level, 
+              tax_status, 
+              updated_at 
+            FROM users 
+            WHERE email = $1`,
+            [email]
+        );
+        if (result.rows.length > 0) {
+            logger.info('User fetched successfully', { email });
+            return result.rows[0];
+        } else {
+            logger.warn('User not found', { email });
+            return null;
+        }
+    } catch (error) {
+        logger.error('Error fetching user by email', { email, error: error.message });
+        throw error;
+    }
+};
+
+const getUserPasswordByEmail = async (pool, email) => {
+    try {
+        const result = await pool.query(
+            `SELECT 
+            *
+            FROM users 
+            WHERE email = $1`,
+            [email]
+        );
         if (result.rows.length > 0) {
             logger.info('User fetched successfully', { email });
             return result.rows[0];
@@ -95,7 +152,42 @@ const getUserByEmail = async (pool, email) => {
 
 const getUserById = async (pool, id) => {
     try {
-        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        const result = await pool.query(
+            `SELECT 
+              account_status, 
+              address_line1, 
+              address_line2, 
+              city, 
+              country, 
+              county, 
+              created_at, 
+              currency, 
+              date_of_birth, 
+              email, 
+              fname, 
+              id, 
+              id_image_url, 
+              inviter_id, 
+              is_auto_renew, 
+              last_login, 
+              marital_status, 
+              mname, 
+              occupation, 
+              payment_method, 
+              phone_number, 
+              poa_image_url, 
+              postal_code, 
+              ppsno, 
+              renewal_date, 
+              role, 
+              sname, 
+              subscription_level, 
+              tax_status, 
+              updated_at 
+            FROM users 
+            WHERE id = $1`,
+            [id]
+        );
         if (result.rows.length > 0) {
             logger.info('User fetched successfully', { id });
             return result.rows[0];
@@ -196,7 +288,42 @@ const saveInviteToken = async (pool, email, token) => {
 
 const getUsersByInviterId = async (pool, inviterId) => {
     try {
-        const result = await pool.query('SELECT * FROM users WHERE inviter_id = $1', [inviterId]);
+        const result = await pool.query(
+            `SELECT 
+              account_status, 
+              address_line1, 
+              address_line2, 
+              city, 
+              country, 
+              county, 
+              created_at, 
+              currency, 
+              date_of_birth, 
+              email, 
+              fname, 
+              id, 
+              id_image_url, 
+              inviter_id, 
+              is_auto_renew, 
+              last_login, 
+              marital_status, 
+              mname, 
+              occupation, 
+              payment_method, 
+              phone_number, 
+              poa_image_url, 
+              postal_code, 
+              ppsno, 
+              renewal_date, 
+              role, 
+              sname, 
+              subscription_level, 
+              tax_status, 
+              updated_at 
+            FROM users 
+            WHERE inviter_id = $1`,
+            [inviterId]
+        );
         logger.info('Fetched users assigned to inviter_id: %s', inviterId);
         return result.rows;
     } catch (error) {
@@ -204,6 +331,69 @@ const getUsersByInviterId = async (pool, inviterId) => {
         throw error;
     }
 };
+
+const updateUserById = async (pool, id, fieldsToUpdate) => {
+    const keys = Object.keys(fieldsToUpdate);
+    if (keys.length === 0) {
+      return null;
+    }
+  
+    const setClauses = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+  
+    const values = [id, ...keys.map((k) => fieldsToUpdate[k])];
+  
+    const query = `
+      UPDATE users
+      ${'SET ' + setClauses}
+      WHERE id = $1
+      RETURNING
+        account_status,
+        address_line1,
+        address_line2,
+        city,
+        country,
+        county,
+        created_at,
+        currency,
+        date_of_birth,
+        email,
+        fname,
+        id,
+        id_image_url,
+        inviter_id,
+        is_auto_renew,
+        last_login,
+        marital_status,
+        mname,
+        occupation,
+        payment_method,
+        phone_number,
+        poa_image_url,
+        postal_code,
+        ppsno,
+        renewal_date,
+        role,
+        sname,
+        subscription_level,
+        tax_status,
+        updated_at
+    `;
+  
+    try {
+      const result = await pool.query(query, values);
+  
+      if (result.rows.length > 0) {
+        logger.info('User updated successfully', { id });
+        return result.rows[0];
+      } else {
+        logger.warn('User not found or not updated', { id });
+        return null;
+      }
+    } catch (error) {
+      logger.error('Error updating user by ID', { id, error: error.message });
+      throw error;
+    }
+  };
 
 module.exports = {
     createUser,
@@ -215,5 +405,7 @@ module.exports = {
     updateUserPassword,
     deleteUserByEmail,
     saveInviteToken,
-    getUsersByInviterId
+    getUsersByInviterId,
+    getUserPasswordByEmail,
+    updateUserById
 };

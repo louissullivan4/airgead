@@ -26,7 +26,6 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
     res.send('Hello, welcome to EquiLedger!');
     logger.info('Root endpoint was accessed');
-    console.log(process.env.INSTANCE_UNIX_SOCKET, process.env.DB_USER, process.env.DB_PASS, process.env.DB_NAME, process.env.DB_PORT);
 });
 
 app.use('/users', userRoutes);

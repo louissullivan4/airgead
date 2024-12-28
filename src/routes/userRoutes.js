@@ -13,7 +13,7 @@ router.get('/:id', authenticateToken, userController.getUser);
 
 router.get('/email/:email', authenticateToken, userController.getUserByEmail);
 
-router.put('/email/:email', authenticateToken, userController.updateUser);
+router.patch('/:id', authenticateToken, userController.updateUser)
 
 router.delete('/email/:email', authenticateToken, userController.deleteUser);
 
