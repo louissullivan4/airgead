@@ -11,3 +11,5 @@ logs/
 sa-key.json
 .vscode/
 src/temp/
+prod-init.sql
+dev-init.sql
