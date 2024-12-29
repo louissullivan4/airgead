@@ -13,3 +13,5 @@ sa-key.json
 src/temp/
 prod-init.sql
 dev-init.sql
+backups/
+restore_command.txt
