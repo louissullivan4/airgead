@@ -110,8 +110,7 @@ const updateExpense = async (pool, id, expense) => {
 
 const partialUpdateExpense = async (pool, id, expense, updateImage) => {
     try {
-        const { user_id, title, description, category, amount, currency, receipt_image_url } = expense;
-        console.log({ user_id, title, description, category, amount, currency, receipt_image_url });
+        const { title, description, category, amount, currency, receipt_image_url } = expense;
         if (!updateImage) {
             const result = await pool.query(
                 'UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *',
@@ -119,7 +118,6 @@ const partialUpdateExpense = async (pool, id, expense, updateImage) => {
             );
             return result.rows[0];
         } else {
-            console.log('updating image');
             const result = await pool.query(
                 'UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 RETURNING *',
                 [title, description, category, amount, currency, receipt_image_url, id]

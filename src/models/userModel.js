@@ -123,7 +123,7 @@ const getUserByEmail = async (pool, email) => {
             return null;
         }
     } catch (error) {
-        logger.error('Error fetching user by email', { email, error: error.message });
+        logger.error('Error fetching user by email', { email, error: error });
         throw error;
     }
 };

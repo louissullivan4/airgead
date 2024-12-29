@@ -287,7 +287,7 @@ const dashboardLogin = async (req, res) => {
     }
 
     try {
-        const user = await userModel.getUserByEmail(req.pool, email);
+        const user = await userModel.getUserPasswordByEmail(req.pool, email);
         if (!user) {
             logger.warn('Invalid login attempt for email: %s', email);
             return res.status(401).json({ error: 'Authentication requirements not fulfilled.' });
