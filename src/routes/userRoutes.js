@@ -28,4 +28,6 @@ router.post('/invite', authenticateToken, authoriseRole(['admin', 'accountant'])
 router.post('/request-password-reset', userController.requestPasswordReset);
 router.post('/reset-password', userController.resetPassword);
 
+router.post('/support', userController.sendSupportEmail)
+
 module.exports = router;

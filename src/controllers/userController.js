@@ -460,6 +460,57 @@ const getAssignedUsers = async (req, res) => {
     }
 };
 
+
+const sendSupportEmail = async (req, res) => {
+    const { userEmail, issueType, issueDescription } = req.body;
+  
+    if (!userEmail || !issueType || !issueDescription) {
+      logger.error('Email, Type and Issue are required for sending a support request.');
+      return res.status(400).json({ error: 'User email is required.' });
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.EMAIL_USERNAME,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      });
+  
+      const mailOptions = {
+        from: process.env.EMAIL_USERNAME,
+        to: process.env.EMAIL_USERNAME, 
+        subject: `Support Request from ${userEmail}`,
+        text: `
+        A user has requested support. Details below:
+
+        From: ${userEmail}
+        Issue Type: ${issueType}
+
+        Issue Description:
+        ${issueDescription}
+        `,
+      };
+  
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          logger.error('Error sending support email:', error);
+          return res.status(500).json({ error: 'Error sending support email.' });
+        } else {
+          logger.info('Support email sent:', info.response);
+          return res.status(200).json({ message: 'Support request sent successfully.' });
+        }
+      });
+    } catch (error) {
+      logger.error('Error in sendSupportEmail:', error.message);
+      return res.status(500).json({ error: 'Internal server error.' });
+    }
+  };
+
 module.exports = {
     createUser,
     getAllUsers,
@@ -473,5 +524,6 @@ module.exports = {
     requestPasswordReset,
     inviteUser,
     dashboardLogin,
-    getAssignedUsers
+    getAssignedUsers,
+    sendSupportEmail
 };
