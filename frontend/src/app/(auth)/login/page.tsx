@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { BRAND } from "@/lib/brand";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function LoginPage() {
 
   return (
     <main>
-      <h1>Sign in to EquiLedger</h1>
+      <h1>Sign in to {BRAND}</h1>
       <form onSubmit={handleSubmit}>
         <label>
           Email

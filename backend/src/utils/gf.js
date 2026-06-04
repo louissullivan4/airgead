@@ -18,8 +18,18 @@ function extractToken(req) {
 }
 
 function generateJwtToken(user) {
+    // `role` is kept for backward compatibility this phase. Org context
+    // (orgId/orgRole/platformRole) is added alongside it. orgId may be
+    // undefined for accounts not yet backfilled — authMiddleware treats a
+    // missing orgId on a presented token as "re-login required" (401).
     return jwt.sign(
-        { userId: user.id, role: user.role },
+        {
+            userId: user.id,
+            role: user.role,
+            orgId: user.org_id,
+            orgRole: user.org_role,
+            platformRole: user.platform_role,
+        },
         jwtSecret,
         { expiresIn: '168h' }
     );

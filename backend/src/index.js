@@ -4,6 +4,7 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const path = require('path');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
+const { BRAND } = require('./config/brand');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config();
@@ -24,7 +25,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
-    res.send('Hello, welcome to EquiLedger!');
+    res.send(`Hello, welcome to ${BRAND}!`);
     logger.info('Root endpoint was accessed');
 });
 

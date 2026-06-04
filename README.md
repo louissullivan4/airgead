@@ -1,11 +1,13 @@
-# EquiLedger
+# rian
 
 Expense tracking and ledger management.
+
+> Formerly "EquiLedger" — see `docs/rename-runbook.md` for the in-progress rename.
 
 ## Structure
 
 ```
-equiledger/
+rian/
 ├── backend/        Express + PostgreSQL API
 ├── frontend/       Next.js web app
 ├── db/             Database scripts

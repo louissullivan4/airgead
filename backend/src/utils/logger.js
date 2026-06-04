@@ -1,6 +1,7 @@
 const { createLogger, format, transports } = require('winston');
 const path = require('path');
 const kleur = require('kleur');
+const { BRAND } = require('../config/brand');
 
 const logDirectory = path.join(__dirname, '..', 'logs');
 
@@ -32,7 +33,7 @@ const logger = createLogger({
             }
         })
     ),
-    defaultMeta: { service: 'equiledger-service' },
+    defaultMeta: { service: `${BRAND}-service` },
     transports: [
         new transports.Console(),
         new transports.File({ filename: path.join(logDirectory, 'error.log'), level: 'error' }),

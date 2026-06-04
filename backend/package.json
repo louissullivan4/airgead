@@ -1,5 +1,5 @@
 {
-  "name": "equiledger",
+  "name": "rian-backend",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,7 +8,11 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "migrate": "node-pg-migrate -j sql -m migrations -d DB_URL",
+    "migrate:up": "node-pg-migrate -j sql -m migrations -d DB_URL up",
+    "migrate:down": "node-pg-migrate -j sql -m migrations -d DB_URL down",
+    "check:brand": "node scripts/check-brand.js"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +32,7 @@
     "kleur": "^4.1.5",
     "moment": "^2.30.1",
     "multer": "^1.4.5-lts.1",
+    "node-pg-migrate": "^7.6.1",
     "nodemailer": "^6.9.15",
     "path": "^0.12.7",
     "pg": "^8.12.0",

@@ -332,6 +332,21 @@ const getUsersByInviterId = async (pool, inviterId) => {
     }
 };
 
+// Phase 0 tenant scoping helper: does the given user belong to the given org?
+// Used by controllers to reject cross-org access (403) on by-id endpoints.
+const isUserInOrg = async (pool, userId, orgId) => {
+    try {
+        const result = await pool.query(
+            'SELECT 1 FROM users WHERE id = $1 AND org_id = $2',
+            [userId, orgId]
+        );
+        return result.rows.length > 0;
+    } catch (error) {
+        logger.error('Error checking user org membership', { userId, orgId, error: error.message });
+        throw error;
+    }
+};
+
 const updateUserById = async (pool, id, fieldsToUpdate) => {
     const keys = Object.keys(fieldsToUpdate);
     if (keys.length === 0) {
@@ -407,5 +422,6 @@ module.exports = {
     saveInviteToken,
     getUsersByInviterId,
     getUserPasswordByEmail,
-    updateUserById
+    updateUserById,
+    isUserInOrg
 };

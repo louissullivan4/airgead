@@ -1,10 +1,31 @@
 const expenseModel = require('../models/expenseModel');
+const userModel = require('../models/userModel');
 const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
+const { getSignedUrl } = require('../utils/signedUrl');
 const { downloadImages, createZipArchive } = require('../middlewares/imageDownload');
+const { isSuperAdmin } = require('../middlewares/tenantScope');
 const fs = require('fs-extra');
 const path = require('path');
 const gf = require('../utils/gf');
+
+// Phase 0 tenant scoping. super_admin bypasses org scoping (null = unscoped);
+// everyone else is restricted to expenses whose user_id is in their org.
+const scopeOrgIdFor = (req) => (isSuperAdmin(req) ? null : req.user.orgId);
+
+// Reject access to a target user's data when that user is not in the caller's
+// org (and the caller is not a super_admin). Returns true if access is denied
+// and a response has been sent.
+const denyIfCrossOrg = async (req, res, targetUserId) => {
+    if (isSuperAdmin(req)) return false;
+    const inOrg = await userModel.isUserInOrg(req.pool, targetUserId, req.user.orgId);
+    if (!inOrg) {
+        logger.warn('Cross-org access attempt by user %s for target user %s', req.user.userId, targetUserId);
+        res.status(403).json({ error: 'Access denied. You do not have permission to access this resource.' });
+        return true;
+    }
+    return false;
+};
 
 const createExpense = async (req, res) => {
     try {
@@ -69,11 +90,14 @@ const getExpenses = async (req, res) => {
         const category = req.query?.category;
         let expenses;
 
+        if (user_id && await denyIfCrossOrg(req, res, user_id)) return;
+        const scopeOrgId = scopeOrgIdFor(req);
+
         if (category) {
-            expenses = await expenseModel.getExpenseByCategory(pool, user_id, category);
+            expenses = await expenseModel.getExpenseByCategory(pool, user_id, category, scopeOrgId);
             logger.info('Expenses fetched by category: %s for user: %s', category, user_id);
         } else {
-            expenses = await expenseModel.getExpensesByUserId(pool, user_id);
+            expenses = await expenseModel.getExpensesByUserId(pool, user_id, scopeOrgId);
             logger.info('Expenses fetched for user: %s', user_id);
         }
         res.status(200).json(expenses);
@@ -88,7 +112,8 @@ const getExpensesByUserId = async (req, res) => {
         const pool = req.pool;
         const id = req.params.id;
         if (id) {
-            const expenses = await expenseModel.getExpensesByUserId(pool, id);
+            if (await denyIfCrossOrg(req, res, id)) return;
+            const expenses = await expenseModel.getExpensesByUserId(pool, id, scopeOrgIdFor(req));
             logger.info('Expenses fetched for user: %s', id);
             res.status(200).json(expenses);
         } else {
@@ -107,7 +132,8 @@ const getExpensesByUserIdNoIncome = async (req, res) => {
         const pool = req.pool;
         const id = req.params.id;
         if (id) {
-            const expenses = await expenseModel.getExpensesByUserIdNoIncome(pool, id);
+            if (await denyIfCrossOrg(req, res, id)) return;
+            const expenses = await expenseModel.getExpensesByUserIdNoIncome(pool, id, scopeOrgIdFor(req));
             logger.info('Expenses fetched for user: %s', id);
             res.status(200).json(expenses);
         } else {
@@ -127,7 +153,8 @@ const getExpensesByUserIdAndYear = async (req, res) => {
         const year = req.params.year;
 
         if (user_id && year) {
-            const expenses = await expenseModel.getExpensesByUserIdAndYear(pool, user_id, year);
+            if (await denyIfCrossOrg(req, res, user_id)) return;
+            const expenses = await expenseModel.getExpensesByUserIdAndYear(pool, user_id, year, scopeOrgIdFor(req));
             logger.info('Expenses fetched for user: %s', user_id);
             res.status(200).json(expenses);
         } else {
@@ -148,7 +175,7 @@ const getExpenseById = async (req, res) => {
         const user_id = req.user.userId;
         const userRole = req.user.role;
 
-        const expense = await expenseModel.getExpenseById(pool, id);
+        const expense = await expenseModel.getExpenseById(pool, id, scopeOrgIdFor(req));
 
         if (!expense) {
             logger.warn('Expense not found with ID: %s', id);
@@ -175,8 +202,9 @@ const updateExpense = async (req, res) => {
         const user_id = req.user.userId;
         const userRole = req.user.role;
         const { title, description, category, amount, currency, receipt_image_url } = req.body;
+        const scopeOrgId = scopeOrgIdFor(req);
 
-        const expense = await expenseModel.getExpenseById(pool, id);
+        const expense = await expenseModel.getExpenseById(pool, id, scopeOrgId);
 
         if (!expense) {
             logger.warn('Expense not found with ID: %s', id);
@@ -195,7 +223,7 @@ const updateExpense = async (req, res) => {
             amount,
             currency,
             receipt_image_url,
-        });
+        }, scopeOrgId);
 
         logger.info('Expense updated successfully with ID: %s', id);
         res.status(200).json(updatedExpense);
@@ -215,18 +243,32 @@ const partialUpdateExpense = async (req, res) => {
         }
 
         const expenseData = extractExpenseData(req);
+        const scopeOrgId = scopeOrgIdFor(req);
+
+        // Verify the target expense is in scope and owned by the caller (or an
+        // admin/accountant) before mutating — mirrors updateExpense/deleteExpense.
+        const existing = await expenseModel.getExpenseById(req.pool, id, scopeOrgId);
+        if (!existing) {
+            logger.warn('Expense not found with ID: %s', id);
+            return res.status(404).json({ error: 'Expense not found.' });
+        }
+        if (existing.user_id !== req.user.userId && !['admin', 'accountant'].includes(req.user.role)) {
+            logger.warn('Unauthorized patch attempt by user: %s for expense ID: %s', req.user.userId, id);
+            return res.status(403).json({ error: 'Access denied. You do not have permission to update this expense.' });
+        }
+
         if (expenseData.image != null) {
             await uploadBase64Image(req, res, async (err) => {
                 if (err) {
                     logger.error('Image upload error: %s', err.message);
                     return res.status(400).json({ error: err.message });
                 }
-                const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, true);
+                const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, true, scopeOrgId);
                 logger.info('Expense updated successfully', newExpense);
                 res.status(201).json(newExpense);
             });
         } else {
-            const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, false);
+            const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, false, scopeOrgId);
             logger.info('Expense updated successfully', newExpense);
             res.status(201).json(newExpense);
         }
@@ -242,8 +284,9 @@ const deleteExpense = async (req, res) => {
         const { id } = req.params;
         const user_id = req.user.userId;
         const userRole = req.user.role;
+        const scopeOrgId = scopeOrgIdFor(req);
 
-        const expense = await expenseModel.getExpenseById(pool, id);
+        const expense = await expenseModel.getExpenseById(pool, id, scopeOrgId);
 
         if (!expense) {
             logger.warn('Expense not found with ID: %s', id);
@@ -255,7 +298,7 @@ const deleteExpense = async (req, res) => {
             return res.status(403).json({ error: 'Access denied. You do not have permission to delete this expense.' });
         }
 
-        await expenseModel.deleteExpense(pool, id);
+        await expenseModel.deleteExpense(pool, id, scopeOrgId);
         logger.info('Expense deleted successfully with ID: %s', id);
         res.status(200).json({ message: 'Expense deleted successfully.' });
     } catch (error) {
@@ -276,9 +319,11 @@ const getExcelDownloadByUserIdAndYear = async (req, res) => {
     const zipFilePath = path.join(tempDir, `expenses_${userId}_${year}_${timestamp}.zip`);
 
     try {
+        if (await denyIfCrossOrg(req, res, userId)) return;
+
         await fs.ensureDir(imagesDir);
 
-        const expenses = await expenseModel.getExpensesByUserIdAndYear(pool, userId, year);
+        const expenses = await expenseModel.getExpensesByUserIdAndYear(pool, userId, year, scopeOrgIdFor(req));
         if (expenses.length === 0) {
             return res.status(404).json({ message: 'No expenses found for the given user and year.' });
         }
@@ -305,10 +350,38 @@ const getExcelDownloadByUserIdAndYear = async (req, res) => {
     }
 };
 
+// Task 6: return a short-lived signed URL for an expense's receipt object.
+// Org-scoped: only returns a URL if the expense is visible to the caller.
+const getReceiptUrl = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user_id = req.user.userId;
+        const userRole = req.user.role;
+
+        const expense = await expenseModel.getExpenseById(req.pool, id, scopeOrgIdFor(req));
+        if (!expense) {
+            return res.status(404).json({ error: 'Expense not found.' });
+        }
+        if (expense.user_id !== user_id && !['admin', 'accountant'].includes(userRole)) {
+            return res.status(403).json({ error: 'Access denied. You do not have permission to access this receipt.' });
+        }
+        if (!expense.receipt_image_url) {
+            return res.status(404).json({ error: 'This expense has no receipt.' });
+        }
+
+        const url = await getSignedUrl(expense.receipt_image_url);
+        res.status(200).json({ url });
+    } catch (error) {
+        logger.error('Error generating receipt signed URL: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     createExpense,
     getExpenses,
     getExpenseById,
+    getReceiptUrl,
     updateExpense,
     deleteExpense,
     getExpensesByUserIdAndYear,

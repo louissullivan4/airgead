@@ -9,6 +9,8 @@ const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
 const gf = require('../utils/gf');
+const { BRAND } = require('../config/brand');
+const { isSuperAdmin } = require('../middlewares/tenantScope');
 
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
@@ -118,6 +120,10 @@ const getUser = async (req, res) => {
             logger.warn('User not found with ID: %s', id);
             return res.status(404).json({ error: 'User not found.' });
         }
+        if (!isSuperAdmin(req) && !(await userModel.isUserInOrg(req.pool, id, req.user.orgId))) {
+            logger.warn('Cross-org user access attempt by %s for user %s', req.user.userId, id);
+            return res.status(403).json({ error: 'Access denied. You do not have permission to access this user.' });
+        }
         logger.info('Fetched user with ID: %s', id);
         res.status(200).json(user);
     } catch (error) {
@@ -135,6 +141,10 @@ const getUserByEmail = async (req, res) => {
             logger.warn('User not found with email: %s', email);
             return res.status(404).json({ error: 'User not found.' });
         }
+        if (!isSuperAdmin(req) && !(await userModel.isUserInOrg(req.pool, user.id, req.user.orgId))) {
+            logger.warn('Cross-org user access attempt by %s for email %s', req.user.userId, email);
+            return res.status(403).json({ error: 'Access denied. You do not have permission to access this user.' });
+        }
         logger.info('Fetched user with email: %s', email);
         res.status(200).json(user);
     } catch (error) {
@@ -145,9 +155,13 @@ const getUserByEmail = async (req, res) => {
 
 const updateUser = async (req, res) => {
     const { id } = req.params;
-    const updateFields = req.body; 
-  
+    const updateFields = req.body;
+
     try {
+      if (!isSuperAdmin(req) && !(await userModel.isUserInOrg(req.pool, id, req.user.orgId))) {
+        logger.warn('Cross-org user update attempt by %s for user %s', req.user.userId, id);
+        return res.status(403).json({ error: 'Access denied. You do not have permission to update this user.' });
+      }
       const updatedUser = await userModel.updateUserById(req.pool, id, updateFields);
   
       if (!updatedUser) {
@@ -217,7 +231,7 @@ const login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password.' });
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, jwtSecret, { expiresIn: '168h' });
+        const token = gf.generateJwtToken(user);
 
         logger.info('User logged in successfully: ', {
             id: user.id,
@@ -305,7 +319,7 @@ const dashboardLogin = async (req, res) => {
             return res.status(401).json({ error: 'Authentication requirements not fulfilled.' });
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, jwtSecret, { expiresIn: '168h' });
+        const token = gf.generateJwtToken(user);
 
         logger.info('User logged in successfully: %s', email);
         res.status(200).json({
@@ -418,7 +432,7 @@ const inviteUser = async (req, res) => {
             from: process.env.EMAIL_USERNAME,
             to: email,
             subject: 'You have been invited to create an account!',
-            text: `You have been invited to create an account with EquiLedger. Click the link to create your account: ${inviteLink}`,
+            text: `You have been invited to create an account with ${BRAND}. Click the link to create your account: ${inviteLink}`,
         };
 
         transporter.sendMail(mailOptions, (error, info) => {

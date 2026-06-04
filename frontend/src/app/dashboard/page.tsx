@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Expense, type User } from "@/lib/api";
+import { BRAND } from "@/lib/brand";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function DashboardPage() {
   return (
     <main>
       <nav>
-        <span>EquiLedger</span>
+        <span>{BRAND}</span>
         <a href="/expenses">Expenses</a>
         <button onClick={handleLogout}>Sign out</button>
       </nav>

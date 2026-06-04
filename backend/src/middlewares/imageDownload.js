@@ -1,17 +1,22 @@
 require('dotenv').config();
 
-const { Storage } = require('@google-cloud/storage');
 const fs = require('fs-extra');
 const path = require('path');
 const archiver = require('archiver');
 const logger = require('../utils/logger');
+const { getBucket } = require('../utils/gcs');
 
-const storage = new Storage({
-    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
-
-const bucket = storage.bucket(process.env.GOOGLE_CLOUD_STORAGE_BUCKET);
+// Convert a stored receipt reference into a GCS object path. New rows store the
+// object path directly (e.g. "org_<id>/2026/abc.jpg" or legacy "ids/abc.jpg").
+// Pre-migration-004 rows still hold a full public URL; strip the scheme/host/
+// bucket prefix to recover the object path.
+const toObjectPath = (stored) => {
+    if (/^https?:\/\//.test(stored)) {
+        const withoutQuery = stored.split('?')[0];
+        return withoutQuery.replace(/^https?:\/\/storage\.googleapis\.com\/[^/]+\//, '');
+    }
+    return stored;
+};
 
 const downloadImages = async (expenses, imagesDir) => {
     await fs.ensureDir(imagesDir);
@@ -19,22 +24,18 @@ const downloadImages = async (expenses, imagesDir) => {
     const downloadPromises = expenses
         .filter(expense => expense.receipt_image_url)
         .map(async (expense) => {
-            const imageUrl = expense.receipt_image_url;
+            const objectPath = toObjectPath(expense.receipt_image_url);
 
-            const urlParts = imageUrl.split('/');
-            const filenameWithQuery = urlParts[urlParts.length - 1];
-            const filename = filenameWithQuery.split('?')[0];
-
-            const imageExtension = path.extname(filename) || '.jpg';
+            const imageExtension = path.extname(objectPath) || '.jpg';
             const imageName = `expense_${expense.id}${imageExtension}`;
             const imagePath = path.join(imagesDir, imageName);
 
-            const file = bucket.file(`ids/${filename}`);
+            const file = getBucket().file(objectPath);
 
             try {
                 const [exists] = await file.exists();
                 if (!exists) {
-                    logger.warn(`File ${filename} does not exist in bucket.`);
+                    logger.warn(`File ${objectPath} does not exist in bucket.`);
                     expense.local_image_path = null;
                     return;
                 }
