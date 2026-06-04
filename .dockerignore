@@ -1,7 +1,12 @@
 node_modules
-npm-debug.log
-Dockerfile
-docker-compose.yml
 .git
 .gitignore
+**/.env
+**/.env.local
+**/npm-debug.log
+docker-compose*.yml
+Dockerfile
+**/.next
+**/dist
+README.md
 sa-key.json

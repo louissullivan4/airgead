@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.env
+sa-key.json
+logs/
+src/uploads/
+src/temp/
+backups/

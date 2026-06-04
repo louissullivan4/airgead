@@ -1,17 +1,53 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Lockfiles (keep package-lock.json out of git for monorepo, adjust if preferred)
 package-lock.json
+
+# Environment files
 .env
-README.md
-src/uploads/
-src/middlewares/uploads
-send.sh
-ls.jpeg
-README.md
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
 logs/
-sa-key.json
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime & OS
+.DS_Store
+Thumbs.db
+
+# Editor
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# Backend specifics
+src/uploads/
+src/middlewares/uploads/
 src/temp/
+backups/
+sa-key.json
+restore_command.txt
 prod-init.sql
 dev-init.sql
-backups/
-restore_command.txt
+send.sh
+ls.jpeg
+
+# Misc
+*.pem

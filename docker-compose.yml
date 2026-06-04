@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-equiledger}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      PORT: 8080
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/usr/src/app
+      - backend_modules:/usr/src/app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      # Inside docker networking use the service name:
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - frontend_modules:/app/node_modules
+      - frontend_next:/app/.next
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  backend_modules:
+  frontend_modules:
+  frontend_next:
