@@ -1,117 +1,66 @@
-Phase 0 Implementation Spec — for Claude Code
-Goal of Phase 0: make the app multi-tenant and secure without changing user-visible behaviour. No new features. Every existing endpoint must still work at the end.
+Phase 1 Implementation Spec — UI Rework: Carbon PWA, Purple Theme, Four Screens
+Depends on: Phase 0 (private storage, org_id in JWT, tenant scoping). The API contract Phase 0 produces is what Phase 1 consumes.
+Goal: Replace the current multi-screen native UI with a simplified, installable web app on Carbon Design with a purple primary, structured as four screens: Home, Transactions, Settings, plus auth. No new backend features — this is presentation + consolidation.
 
-There is no schema in the repo. Tables (users, expenses, user_invites) exist only on the live DB. Do not invent column definitions — capture the real schema first (Task 1).
-No migration tooling exists. Introduce node-pg-migrate. Do not add an ORM. Migrations are plain SQL.
-JWT payload is currently { userId, role } (see userController.login, dashboardLogin, gf.generateJwtToken). It has no org context. Phase 0 adds orgId to the token.
-All controllers read req.user.userId. Preserve that. Add org scoping alongside, don't replace.
-req.pool is injected via poolMiddleware. Use it; don't import the pool directly in new code.
-This is a live database with real users. Every destructive step must be reversible and gated. Run nothing against production automatically.
+New web/ app (or new repo): Next.js (App Router) + TypeScript + @carbon/react + Sass.
+PWA setup: manifest.json (name = the new brand from Phase 0's Task 0, theme color = your purple, display: standalone, icons), a service worker for the offline app shell, installability criteria met.
+Auth wiring to the existing Express API: login/signup pages hitting /users/login and /users/signup; store JWT (httpOnly cookie preferred over localStorage for a financial app); attach Authorization: Bearer to API calls; handle the Phase 0 "token missing orgId → 401 re-login" case by redirecting to login.
+API base URL from env (the stable custom domain you set up in Phase 0 Task 0.2, not the raw Cloud Run URL).
+Route guard: unauthenticated users → login; authenticated → app shell with the four-screen nav.
 
-Hard constraints
+Task 2 — Purple theme via Carbon tokens
 
-Backward compatible: old JWTs (without orgId) must not 500 the API — handle their absence gracefully (treat as "needs re-login" with 401, never a crash).
-Each migration has a working down.
-No endpoint loses functionality. The diff to controllers should be minimal and mechanical.
-Secrets/.env untouched except documented additions.
+Create src/styles/theme.scss as the single styling entrypoint.
+Override the theme using the Sass with (...) mechanism. Set the interactive/brand tokens to your purple ramp. Carbon's own palette already includes purple-60 ≈ #8a3ffc, which is a safe, accessibility-tested anchor — use the Carbon purple ramp values rather than hand-picked hexes so contrast ratios stay AA-compliant.
+Override at minimum: $interactive, $link-primary, $focus, and the button component tokens ($button-primary, $button-primary-hover, $button-primary-active) — the search confirmed buttons need their own component-token override, not just the global theme token, or primary buttons stay blue.
+Provide per-theme value maps (White / Gray 10 light, Gray 90 / 100 dark) so dark mode works if you enable it. Don't ship dark mode in Phase 1 unless trivial; just leave the maps stubbed.
+One brand constant module re-exporting the name + primary hex, consumed by manifest, emails, and UI (consistent with Phase 0 Task 0.1's single-source-of-truth rule).
 
-Task 0 — Rename equiLedger → rian
-Prerequisite: human confirms final name + has secured domain and checked CRO/EUIPO. Claude Code must not invent the name.
-0.1 Cosmetic layer (safe): replace user-facing "EquiLedger"/"equiledger" in: README.md, UI copy, package.json name (both repos), app.json/manifest, email templates and sender identity, support strings. Add a BRAND constant in one config module so the name lives in a single place going forward — no more scattered string literals.
-0.2 Identifier layer (gated, human-run): produce a docs/rename-runbook.md listing the external renames the human performs, not Claude Code:
+Task 3 — Home screen
+Consolidates the current Homescreen + HomeCard + ContactCard.
 
-GitHub repo rename (GitHub auto-redirects old URLs, but update remotes).
-New Cloud Run service under the new name; deploy; then update mobile/servers.txt + frontend SERVER_URL env to the new URL; verify before deleting the old service.
-npm package name (if published).
+Stat tiles (Carbon Tile / ClickableTile): current tax-year expenses total, income total, net, and receipts pending review (the receipt_status='pending' count once Phase 2 lands; until then, total receipts). Pull from existing /expenses/users/:id/:year.
+Category breakdown chart: @carbon/charts-react donut or simple bar by category. Note @carbon/charts-react is a separate install with its own peer deps — call it out so Claude Code adds it explicitly.
+Recent activity: last N transactions as a compact list, each linking into the Transactions screen.
+Contact/support entry point: fold the old ContactCard into a small support link/section rather than its own card.
+All numbers respect the selected currency from the user's profile.
 
-0.3 Explicitly out of scope for Phase 0 (document, don't do): GCS bucket rename (buckets are immutable — handled via object-key prefix in Task 6, full bucket migration deferred), Postgres database name. Leave both as-is.
-0.4 Add a regression check: grep the codebase for the old name post-rename; the only permitted remaining references are in docs/rename-runbook.md and historical migration comments.
+Task 4 — Transactions screen (the big consolidation)
+Replaces Expensescreen, Incomescreen, CreateExpenseScreen, CreateIncomeScreen, ExpenseList, and the native swipe actions — five screens collapse into one.
 
+Single Carbon DataTable of all transactions.
+Filter for All / Expenses / Income (income is category='income' per the current model; the existing getExpensesByUserIdNoIncome and category logic back this).
+TableToolbar: search, the type filter, and an Export button (wired to the existing Excel/zip endpoints; CSV/Sage come in later phases — Export can be present but offer only what exists now).
+Add button: opens a Modal (or side panel) with the create form. In Phase 2 this button's behaviour changes to camera-first, so isolate the "open add flow" handler now so Phase 2 swaps it cleanly.
+Row actions via OverflowMenu: Edit (same modal, pre-filled), Delete (with a confirm Modal — replaces the old swipe-to-delete Alert).
+Receipt thumbnail per row: fetch via the Phase 0 signed-URL endpoint, not a stored public URL.
+Pagination + sort via DataTable's built-ins; default sort by date desc (matches current ORDER BY updated_at DESC).
+The create/edit form fields map exactly to the current expenses columns (title, description, category, amount, currency, receipt image) so no API change is needed.
 
-Task 1 — Capture current schema & set up migrations
+Task 5 — Settings screen
+Consolidates ProfileScreen + ProfileCard + logout.
 
-Add node-pg-migrate and a migrate script to package.json ("migrate": "node-pg-migrate -j sql"), configured to read DB_URL.
-Create /migrations directory.
-Create docs/schema-capture.md with the exact commands the human must run against production and paste back:
+Profile view/edit (maps to existing /users/:id PATCH).
+Currency preference.
+Subscription/tier display (read-only in Phase 1; becomes interactive in Phase 4).
+Data-retention notice placeholder ("records retained until…" — populated in Phase 3).
+Logout (replaces LogoutButton).
+For business/accountant orgs, a stub entry point to client management (built in Phase 6) — show it only if orgRole='owner' on a business org; hide for personal orgs. This uses the Phase 0 role axes already in the JWT.
 
-pg_dump --schema-only "$DB_URL" > db/schema.sql
-fallback: psql "$DB_URL" -c "\d users" -c "\d expenses" -c "\d user_invites"
+Task 6 — Navigation, retire old screens, tidy
 
+App-shell nav: Carbon SideNav (desktop) / bottom nav or header menu (mobile-width), four destinations: Home, Transactions, Settings, + support.
+Retire the Expo screens listed above. If keeping the Expo repo (Path B not chosen), mark it deprecated; if abandoning native, archive it.
+Responsive: this is a phone-first browser app, so verify the DataTable and tiles collapse cleanly at mobile widths (Carbon's grid + responsive DataTable behaviours).
+Loading/empty/error states for every screen (Carbon SkeletonText, InlineNotification).
 
-STOP and wait for the human to commit db/schema.sql. Do not write any ALTER/migration touching existing tables until that file exists in the repo. Write a baseline migration that is a no-op reflecting the captured schema (so migration history has a known starting point).
+Deliverables checklist
 
-
-Claude Code: if db/schema.sql is absent, do Tasks 1 and 6 (those don't need it) and leave a clear TODO blocking Tasks 2–5.
-
-Task 2 — organisations table + accounts evolution
-Write migration 001_organisations_and_accounts:
-up:
-
-Create organisations: id (uuid, pk, default gen), name text not null, type text check in ('personal','business') not null, owner_account_id (uuid, nullable for now — set in Task 3), subscription_level, renewal_date, is_auto_renew, payment_method (copy types from captured users schema), created_at, updated_at.
-Alter users (do not rename the table in Phase 0 — too risky with live queries; keep users, treat it as "accounts" conceptually):
-
-add org_id uuid, FK → organisations(id), nullable for now (backfilled in Task 3).
-add org_role text check in ('owner','member') default 'owner'.
-add platform_role text check in ('user','super_admin') default 'user'.
-
-
-Add index on users(org_id) and expenses(user_id) if not already present.
-
-down: drop the added columns and the organisations table.
-
-Keep the existing role column for now — don't drop it in Phase 0. Map it in Task 3, remove it in a later phase once nothing reads it.
-
-Task 3 — Data backfill migration (the gated, destructive-ish one)
-Write migration 002_backfill_orgs as idempotent SQL:
-
-For every existing user, create a personal organisation, set users.org_id to it, org_role='owner'.
-Preserve accountant groupings: the human will confirm whether inviter_id is populated.
-
-If a user has inviter_id pointing to an accountant, instead of a solo org, attach them as a member of the inviter's organisation. (Write the SQL to handle both cases; guard the inviter branch behind a clear comment so it's easy to disable.)
-
-
-Map old role → new axes: role IN ('admin') → platform_role='super_admin'; role IN ('accountant') → org_role='owner' on a business-type org; everyone else org_role='owner' on personal org.
-After backfill: set organisations.owner_account_id, then a follow-up migration 003_enforce_not_null makes users.org_id NOT NULL.
-
-
-Claude Code: put a banner comment at the top of 002 and 003: "DESTRUCTIVE / DATA-DEPENDENT — do not run until db/schema.sql committed and inviter_id question answered." Provide a dry-run query (counts of users, users-with-inviter, expected orgs created) the human runs first.
-
-Task 4 — JWT carries org context
-
-gf.generateJwtToken and both login paths (login, dashboardLogin): add orgId and orgRole, platformRole to the signed payload alongside existing userId/role (keep role for backward compat this phase).
-authMiddleware.authenticateToken: after verify, if orgId missing from token, return 401 with a re-login required message (not 403, not 500). This handles users holding pre-migration tokens.
-
-Task 5 — Tenant-scoping middleware + query scoping
-
-New src/middlewares/tenantScope.js: exports scopeToOrg that reads req.user.orgId and attaches it; and requirePlatformRole(role) / requireOrgRole(role) replacing the overloaded authoriseRole usage. super_admin bypasses org checks.
-expenseModel: add an org_id predicate to every read/write/delete. Since expenses currently keys on user_id, Phase 0 scoping = "user_id belongs to req.user.orgId." Add a guard in controllers that rejects cross-org access with 403. (Full expenses.org_id denormalisation can be a Phase 0.5 migration; for now enforce via the user→org relationship to keep the change small.)
-Update expenseController and userController: every handler that fetches/mutates by :id must verify the target belongs to the caller's org (or caller is super_admin).
-
-Task 6 — GCS: private objects + signed URLs + tenant key prefix
-
-imageUpload.js: remove file.makePublic(). Change object key from ids/${filename} to org_${orgId}/${year}/${receiptId}.${ext} (orgId from req.user.orgId, year from now). Stop returning a public storage.googleapis.com URL; store the object path in DB instead of a public URL.
-New src/utils/signedUrl.js: getSignedUrl(objectPath, ttlSeconds=300).
-New endpoint GET /expenses/:id/receipt-url (authed + org-scoped) returning a fresh signed URL.
-imageDownload.js: update to read by stored object path rather than parsing a public URL.
-Migration 004_receipt_path (data, gated): existing rows store full public URLs in receipt_image_url; write SQL to extract the object path. Provide a dry-run SELECT first. Flag clearly that old objects are still public in the bucket until a one-time makePrivate script (provide scripts/lockdown-bucket.js, run manually) is executed.
-
-
-Deliverables checklist for Claude Code
-
- package.json: node-pg-migrate + scripts
- /migrations/000_baseline … 004_receipt_path
- docs/schema-capture.md + committed db/schema.sql (human-provided)
- tenantScope.js, updated authMiddleware.js, signedUrl.js
- Updated imageUpload.js, imageDownload.js, both controllers, both models, gf.js
- scripts/lockdown-bucket.js (manual run)
- docs/phase-0-runbook.md: exact order to run, dry-run queries, rollback steps
- Existing tests pass; add tests for tenant isolation (user A cannot read user B's expense) and for missing-orgId-token → 401
-
-Suggested commit/PR order
-
-Migration tooling + schema capture (Task 1, 6-no-op parts)
-Schema migrations 001 (Task 2)
-JWT + auth changes (Task 4) — deploy, everyone re-logs in
-Backfill 002/003 (Task 3) — gated
-Tenant scoping (Task 5)
-GCS lockdown 004 + bucket script (Task 6)
+ Next.js + @carbon/react + Sass scaffold, PWA manifest + service worker, installable
+ theme.scss purple override (global tokens and button component tokens), brand constant module
+ Home (tiles + @carbon/charts-react + recent activity)
+ Transactions (single DataTable, filter, toolbar+export, add/edit modal, overflow row actions, signed-URL thumbnails)
+ Settings (profile, currency, tier read-only, retention placeholder, conditional client-mgmt stub)
+ Auth pages + route guard + orgId-missing → re-login handling
+ Old Expo screens retired/deprecated
+ Responsive + loading/empty/error states throughout

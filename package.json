@@ -12,6 +12,8 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "docker compose build",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspace=backend"
+    "test": "npm run test --workspace=backend",
+    "seed": "docker compose exec -T backend npm run seed",
+    "local": "bash scripts/dev.sh"
   }
 }

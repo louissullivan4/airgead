@@ -9,14 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@carbon/charts": "^1.21.0",
+    "@carbon/charts-react": "^1.21.0",
+    "@carbon/react": "^1.71.0",
+    "d3": "^7.9.0",
     "next": "^15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/d3": "^7.4.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "sass": "^1.77.0",
     "typescript": "^5",
     "eslint": "^9",
     "eslint-config-next": "^15.3.2"

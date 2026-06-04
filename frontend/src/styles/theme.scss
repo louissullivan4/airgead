@@ -1,0 +1,204 @@
+// Single styling entrypoint for the rian web app.
+//
+// Purple brand theme built on Carbon's own purple ramp (AA-tested) rather than
+// hand-picked hexes, so contrast ratios stay compliant:
+//   purple-60 #8a3ffc  (primary / interactive)   -> keep in sync with BRAND_PRIMARY
+//   purple-70 #6929c4  (hover)
+//   purple-80 #491d8b  (active)
+//
+// Both the global brand tokens AND the button component tokens are overridden —
+// button-primary* must be set explicitly or primary buttons stay Carbon blue.
+
+// Disable Carbon's own @font-face emission. It references IBM Plex via webpack's
+// `~@ibm/plex/...` URL syntax, which Turbopack (next dev) cannot resolve. We load
+// IBM Plex ourselves via a Google Fonts <link> in app/layout.tsx instead. Must be
+// configured before any Carbon module that reads the config loads.
+@use "@carbon/styles/scss/config" with (
+  $css--font-face: false,
+);
+
+// Light theme (default). Anchored on the White theme with brand overrides.
+@use "@carbon/react/scss/theme" with (
+  $theme: (
+    interactive: #8a3ffc,
+    link-primary: #8a3ffc,
+    link-primary-hover: #6929c4,
+    focus: #8a3ffc,
+    background-brand: #8a3ffc,
+    button-primary: #8a3ffc,
+    button-primary-hover: #6929c4,
+    button-primary-active: #491d8b,
+  )
+);
+
+@use "@carbon/react";
+@use "@carbon/styles/scss/grid";
+
+// Per-theme value maps for future dark mode. Stubbed only — dark mode is NOT
+// shipped in Phase 1. When enabling, wire these into a g100/g90 <Theme> block.
+//
+// $brand-dark: (
+//   interactive: #a56eff,
+//   link-primary: #a56eff,
+//   focus: #a56eff,
+//   button-primary: #8a3ffc,
+//   button-primary-hover: #a56eff,
+//   button-primary-active: #6929c4,
+// );
+
+// Carbon's button component tokens are NOT part of the core theme map — they
+// resolve from a separate generated per-theme map and stay blue if only the
+// global theme is overridden. Pin them (and the brand tokens, for certainty) as
+// CSS custom properties on :root so the var() fallbacks throughout Carbon resolve
+// to the purple ramp at runtime.
+:root {
+  color-scheme: light;
+
+  --cds-interactive: #8a3ffc;
+  --cds-link-primary: #8a3ffc;
+  --cds-link-primary-hover: #6929c4;
+  --cds-focus: #8a3ffc;
+  --cds-background-brand: #8a3ffc;
+  --cds-button-primary: #8a3ffc;
+  --cds-button-primary-hover: #6929c4;
+  --cds-button-primary-active: #491d8b;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--cds-background, #ffffff);
+}
+
+// App layout helpers ---------------------------------------------------------
+
+.app-shell {
+  min-height: 100vh;
+}
+
+// Content sits under the fixed Carbon header (3rem) and beside the side nav on
+// desktop; full-width with bottom nav clearance on mobile.
+.app-content {
+  margin-top: 3rem;
+  padding: 1.5rem;
+}
+
+@media (min-width: 66rem) {
+  .app-content {
+    margin-left: 16rem; // SideNav width
+  }
+}
+
+@media (max-width: 65.98rem) {
+  .app-content {
+    padding-bottom: 5rem; // clearance for the bottom nav
+  }
+
+  // The persistent Carbon SideNav is desktop-only; on mobile the bottom nav
+  // takes over, so hide the SideNav (it otherwise overlays the whole screen).
+  .cds--side-nav {
+    display: none;
+  }
+}
+
+.page-title {
+  margin-bottom: 1.5rem;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-tile__label {
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.stat-tile__value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+// Mobile bottom navigation ---------------------------------------------------
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  background: var(--cds-layer);
+  border-top: 1px solid var(--cds-border-subtle);
+  z-index: 8000;
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.bottom-nav__item--active {
+  color: var(--cds-link-primary);
+}
+
+@media (min-width: 66rem) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+// Centered auth pages --------------------------------------------------------
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.auth-card .cds--text-input,
+.auth-card .cds--select,
+.auth-card .cds--btn {
+  margin-bottom: 1rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+.receipt-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid var(--cds-border-subtle);
+}

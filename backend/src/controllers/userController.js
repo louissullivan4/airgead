@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 const userModel = require('../models/userModel');
+const organisationModel = require('../models/organisationModel');
 const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
@@ -292,6 +293,63 @@ const signup = async (req, res) => {
     }
 };
 
+// Phase 1 signup. Handles both self-serve (no token) and invite-based (token
+// from the invite email) registration, provisioning org context so the issued
+// JWT carries orgId and the account is immediately usable. Replaces the old
+// `signup` stub which only validated an invite and never created a user.
+const register = async (req, res) => {
+    const { token, fname, sname, email, password, currency } = req.body;
+
+    if (!fname || !sname || !email || !password || !currency) {
+        return res.status(400).json({
+            error: 'First name, surname, email, password and currency are required.',
+        });
+    }
+
+    let mode = 'self';
+    let inviterId = null;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, jwtSecret);
+            if (decoded.email && decoded.email !== email) {
+                return res.status(400).json({ error: 'Invite is for a different email address.' });
+            }
+            inviterId = decoded.inviter_id || null;
+            mode = 'invite';
+        } catch (error) {
+            logger.warn('Invalid invite token on register: %s', error.message);
+            return res.status(400).json({ error: 'Invalid or expired invite token.' });
+        }
+    }
+
+    try {
+        const unique = await userModel.isEmailUnique(req.pool, email);
+        if (!unique) {
+            return res.status(400).json({ error: 'User with this email already exists.' });
+        }
+
+        const passwordHash = await gf.hashPassword(password);
+        const newUser = await organisationModel.createUserWithOrg(req.pool, {
+            user: { ...req.body, password: passwordHash },
+            mode,
+            inviterId,
+        });
+
+        const newToken = gf.generateJwtToken(newUser);
+        logger.info('Account registered: %s (%s)', email, mode);
+        return res.status(201).json({
+            id: newUser.id,
+            name: newUser.fname,
+            email: newUser.email,
+            role: newUser.role,
+            token: newToken,
+        });
+    } catch (error) {
+        logger.error('Error during registration: %s', error.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 const dashboardLogin = async (req, res) => {
     const { email, password } = req.body;
 
@@ -534,6 +592,7 @@ module.exports = {
     deleteUser,
     login,
     signup,
+    register,
     resetPassword,
     requestPasswordReset,
     inviteUser,
