@@ -4,7 +4,7 @@ const expenseModel = require('../models/expenseModel');
 const logger = require('../utils/logger');
 const storage = require('../utils/storage');
 const { getSignedUrl } = require('../utils/signedUrl');
-const { cleanReceipt } = require('../utils/receiptCleanup');
+const { cleanReceipt, binarise } = require('../utils/receiptCleanup');
 const { getOcrProvider } = require('../services/ocr');
 const { isSuperAdmin } = require('../middlewares/tenantScope');
 
@@ -41,26 +41,29 @@ const processReceipt = async (req, res) => {
             return res.status(400).json({ error: 'Invalid image format. Please provide a valid Base64-encoded image.' });
         }
 
-        // capture -> [crop: deferred] -> binarise
-        const { binarisedBuffer } = await cleanReceipt(inputBuffer);
+        // capture -> [crop: deferred] -> compress (legible JPEG kept for the user)
+        const { imageBuffer, contentType, ext } = await cleanReceipt(inputBuffer);
 
         // store: private object key under the Phase 0 tenant scheme.
         const receiptId = uuidv4();
         const year = new Date().getFullYear();
-        const objectPath = `org_${orgId}/${year}/${receiptId}.png`;
-        await storage.putObject(objectPath, binarisedBuffer, 'image/png');
+        const objectPath = `org_${orgId}/${year}/${receiptId}.${ext}`;
+        await storage.putObject(objectPath, imageBuffer, contentType);
 
         // OCR branch — DORMANT. getOcrProvider() returns null while
         // OCR_PROVIDER=none, so nothing here runs today. Flipping the env var
         // later activates auto-fill with no code change: the receipt is created
         // 'pending' (awaiting user confirmation) and carries the parsed data.
+        // OCR reads a throwaway binarised copy (better for text recognition);
+        // the stored image stays the legible compressed original.
         let parsedData = null;
         let ocrConfidence = null;
         let receiptStatus = 'reviewed';
         const merchantFields = {};
         const ocr = getOcrProvider();
         if (ocr) {
-            const result = await ocr.extract(binarisedBuffer);
+            const ocrInput = await binarise(inputBuffer);
+            const result = await ocr.extract(ocrInput);
             parsedData = result;
             ocrConfidence = result.fieldConfidence
                 ? Object.values(result.fieldConfidence).reduce((a, b) => a + b, 0) /

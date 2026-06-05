@@ -32,7 +32,7 @@ See docs/phase-2-capture.md for the full pipeline, model, endpoints, and the fla
 
 [DONE] Add-expense flow opens the camera immediately (native <input capture>); "Skip photo" falls back to the blank manual form (unchanged behaviour).
 [DEFERRED] Edge detection + perspective crop — no-op seam + TODO in receiptCleanup.js (OpenCV findContours + warpPerspective). Deferred to avoid a finicky native dep on node:20-alpine; a missed crop beats one that cuts off the total.
-[DONE] Binarisation — sharp grayscale + adaptive threshold to a 1-bit black/white PNG. Removes background noise and slashes file size; this cleaned image is what gets stored.
+[DONE] Stored image — sharp auto-orient + resize (max 2200px) + JPEG q85. The stored/served receipt is the legible compressed original (decompresses for the user automatically on download). Binarisation to 1-bit B&W is kept as an OCR-only throwaway (receiptCleanup.binarise), NOT stored — storing the binarised copy made downloads blurry/illegible.
 [DONE] Receipts ↔ expenses split — new receipts table; one receipt → many expense line items (expenses.receipt_id, nullable). Manual no-photo expenses still allowed; legacy receipt_image_url kept for backward compat.
 [DONE/DORMANT] OCR adapter seam — OcrProvider interface + MockOcrProvider (only impl) + HostedOcrProvider stub (Veryfi/Tabscanner/Eagle Doc/Azure, EU residency). getOcrProvider() reads OCR_PROVIDER (default 'none' = disabled). Not wired into the live flow.
 [DONE/DORMANT] Auto-fill form from OCR JSON with per-field confidence indicators — coded behind OCR_AUTOFILL_ENABLED / NEXT_PUBLIC_OCR_AUTOFILL_ENABLED (default false). raw OCR result reserved in receipts.parsed_data (jsonb). Off = the user just types.

@@ -15,7 +15,7 @@ deferred until validated.
 ## Pipeline (load-bearing order)
 
 ```
-capture → [perspective-crop: deferred] → binarise → [OCR: mock-only, flag-gated] → compress → store
+capture → [perspective-crop: deferred] → compress → store   (+ binarise → OCR, dormant)
 ```
 
 - **capture** — browser native camera via `<input type="file" accept="image/*"
@@ -24,16 +24,22 @@ capture → [perspective-crop: deferred] → binarise → [OCR: mock-only, flag-
   no-op `cropReceipt()` seam and a `TODO` for OpenCV `findContours` +
   `warpPerspective`. Deferred to avoid a finicky native dependency on the
   `node:20-alpine` image. A missed crop beats one that cuts off the total.
-- **binarise** — `sharp`: grayscale → normalise → light denoise → adaptive
-  threshold to **1-bit black/white**, output **PNG** (palette, 2 colours). Lossless
-  and tiny for bilevel text — never JPEG. This cleaned image is what gets stored;
-  it is the storage-cost win.
+- **compress + store** — `sharp`: auto-orient (EXIF) → resize to a bounded long
+  edge (`MAX_EDGE` 2200px) → re-encode to a **JPEG (quality 85, colour)**. This
+  legible compressed image is what gets stored and served back. Image formats are
+  already "compress on store / decompress on view", so the browser decompresses
+  the JPEG transparently on download — the user sees the real receipt. Written
+  privately via the storage driver under the Phase 0 tenant key scheme
+  `org_{orgId}/{year}/{receiptId}.jpg`; reads go through short-lived signed URLs
+  (never public).
+- **binarise (OCR only, not stored)** — `binarise()` produces a destructive 1-bit
+  black/white PNG. It is **only** ever used as a throwaway input to OCR (better for
+  text recognition), never stored or shown to the user. Binarising before storing
+  was the original "cost win" but made the downloaded receipt blurry/illegible, so
+  the stored copy is the compressed original instead.
 - **OCR** — *dormant.* Only runs if `getOcrProvider()` returns non-null, i.e. when
   `OCR_PROVIDER !== 'none'`. Default is `none`, so no provider is constructed or
-  called on the live flow.
-- **compress + store** — the binarised PNG is written privately via the storage
-  driver under the Phase 0 tenant key scheme `org_{orgId}/{year}/{receiptId}.png`.
-  Reads go through short-lived signed URLs (never public).
+  called and `binarise()` is never invoked on the live flow.
 
 ## Data model: receipts ↔ expenses
 
@@ -117,7 +123,8 @@ implemented.**
 
 - `receiptModel.test.js` — receipt org scoping; `getExpensesByReceiptId` scoping;
   line items link to a receipt; manual path stores a null `receipt_id`.
-- `ocrAndCleanup.test.js` — `cleanReceipt` returns a non-empty PNG + `cropped:false`;
+- `ocrAndCleanup.test.js` — `cleanReceipt` returns a legible JPEG + `cropped:false`;
+  `binarise` (OCR-only) returns a 1-bit PNG;
   `getOcrProvider()` disabled by default / returns mock for `mock`; `MockOcrProvider`
   shape.
 - `receiptController.test.js` — `/receipts/process` cleans + stores without invoking

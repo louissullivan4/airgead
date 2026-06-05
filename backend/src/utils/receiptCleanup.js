@@ -2,15 +2,24 @@ const sharp = require('sharp');
 const logger = require('../utils/logger');
 
 // Phase 2 receipt image cleanup. Pipeline position:
-//   capture -> [perspective crop: deferred] -> binarise -> compress -> store
+//   capture -> [perspective crop: deferred] -> compress -> store
 //
-// The cleaned image is what gets STORED — that's the cost win: a 1-bit black/
-// white PNG of a thermal receipt is a fraction of the size of the colour photo,
-// and lossless (never JPEG for B&W text). See storage.js for where it lands.
+// What gets STORED is a normal, legible image: the original photo, auto-oriented,
+// size-bounded, and re-encoded to a compressed JPEG. Image formats are already
+// "compress on store / decompress on view" — any viewer or browser decompresses
+// the JPEG transparently on download, so the user sees the real receipt.
+//
+// NOTE: we intentionally do NOT store a binarised (1-bit black/white) image.
+// Binarisation is destructive — it permanently discards the grey detail — so it
+// is only ever used as a throwaway input for OCR (see `binarise` below), never
+// as the thing we keep and serve back to the user.
 
-// Conservative default threshold (0-255). Lower keeps faint thermal text at the
-// cost of more background speckle; higher cleans the background but can drop
-// light strokes. Tunable here (and overridable per-call).
+// Cap the long edge so a 12MP phone photo doesn't bloat storage while staying
+// easily legible for a tax record. ~2200px keeps small print readable.
+const MAX_EDGE = 2200;
+const JPEG_QUALITY = 85;
+
+// Conservative default threshold (0-255) for the OCR-only binarisation path.
 const DEFAULT_THRESHOLD = 140;
 
 // TODO: perspective crop (OpenCV findContours + warpPerspective, or a Python
@@ -23,34 +32,44 @@ const cropReceipt = async (buffer) => {
     return { buffer, cropped: false };
 };
 
-// Grayscale + adaptive-ish threshold to a 1-bit black/white PNG.
+// Compress the captured photo to a legible, size-bounded JPEG for storage.
 // `.rotate()` (no args) auto-orients from EXIF — important for phone captures.
+const compress = async (buffer) => {
+    return sharp(buffer)
+        .rotate()
+        .resize(MAX_EDGE, MAX_EDGE, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+        .toBuffer();
+};
+
+// Grayscale + threshold to a 1-bit black/white PNG. DESTRUCTIVE — for OCR input
+// only (dormant today); never stored as the user-facing receipt.
 const binarise = async (buffer, threshold = DEFAULT_THRESHOLD) => {
     return sharp(buffer)
         .rotate()
         .greyscale()
         .normalise()
-        .median(1) // light denoise to kill isolated speckle before thresholding
         .threshold(threshold)
         .png({ compressionLevel: 9, palette: true, colours: 2 })
         .toBuffer();
 };
 
-// Clean a captured receipt image. Returns the binarised PNG buffer ready to
-// store, plus whether a perspective crop was applied (always false for now).
-const cleanReceipt = async (inputBuffer, { threshold } = {}) => {
+// Clean a captured receipt image for storage. Returns the compressed image
+// buffer plus the content type / extension to store it under, and whether a
+// perspective crop was applied (always false for now).
+const cleanReceipt = async (inputBuffer) => {
     if (!inputBuffer || inputBuffer.length === 0) {
         throw new Error('cleanReceipt requires a non-empty image buffer.');
     }
     try {
         const { buffer: croppedBuffer, cropped } = await cropReceipt(inputBuffer);
-        const binarisedBuffer = await binarise(croppedBuffer, threshold);
+        const imageBuffer = await compress(croppedBuffer);
         logger.info('Receipt cleaned', {
             inputBytes: inputBuffer.length,
-            outputBytes: binarisedBuffer.length,
+            outputBytes: imageBuffer.length,
             cropped,
         });
-        return { binarisedBuffer, cropped };
+        return { imageBuffer, contentType: 'image/jpeg', ext: 'jpg', cropped };
     } catch (error) {
         logger.error('Error cleaning receipt image', { error: error.message });
         throw error;
@@ -59,5 +78,8 @@ const cleanReceipt = async (inputBuffer, { threshold } = {}) => {
 
 module.exports = {
     cleanReceipt,
+    binarise,
     DEFAULT_THRESHOLD,
+    MAX_EDGE,
+    JPEG_QUALITY,
 };

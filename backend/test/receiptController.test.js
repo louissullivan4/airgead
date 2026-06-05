@@ -41,11 +41,11 @@ describe('receiptController', () => {
 
             await receiptController.processReceipt(req, res);
 
-            // stored under the Phase 0 tenant key scheme, as a PNG
+            // stored under the Phase 0 tenant key scheme, as a legible JPEG
             expect(putObject.calledOnce).toBe(true);
             const [objectPath, , contentType] = putObject.firstCall.args;
-            expect(objectPath).toMatch(/^org_org-A\/\d{4}\/[0-9a-f-]+\.png$/);
-            expect(contentType).toBe('image/png');
+            expect(objectPath).toMatch(/^org_org-A\/\d{4}\/[0-9a-f-]+\.jpg$/);
+            expect(contentType).toBe('image/jpeg');
 
             // receipt created in the manual 'reviewed' state with no parsed data
             const created = createReceipt.firstCall.args[1];
