@@ -2,23 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  ClickableTile,
-  SkeletonText,
-  SkeletonPlaceholder,
-  InlineNotification,
-  Button,
-} from "@carbon/react";
-import { DonutChart } from "@carbon/charts-react";
+import { ArrowDownLeft, ArrowUpRight, Plus, Receipt, Scale } from "lucide-react";
 import {
   api,
   amountOf,
-  isIncome,
   formatCurrency,
+  isIncome,
   type Expense,
   type UserProfile,
 } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { PageHeader } from "@/components/page-header";
+import { StatCard, StatGrid } from "@/components/stat-card";
+import { CategoryBreakdown } from "@/components/category-breakdown";
+import { TransactionList } from "@/components/transaction-list";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const TAX_YEAR = new Date().getFullYear();
 
@@ -75,110 +76,126 @@ export default function HomePage() {
       if (e.receipt_image_url) receiptCount += 1;
     }
 
-    const byCategory = Array.from(categoryMap, ([group, value]) => ({ group, value }));
+    const byCategory = Array.from(categoryMap, ([category, value]) => ({ category, value }));
     const recent = [...expenses]
       .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-      .slice(0, 5);
+      .slice(0, 6);
 
-    return {
-      income,
-      expensesTotal,
-      net: income - expensesTotal,
-      receiptCount,
-      byCategory,
-      recent,
-    };
+    return { income, expensesTotal, net: income - expensesTotal, receiptCount, byCategory, recent };
   }, [expenses]);
 
   if (loading || sessionLoading) {
     return (
-      <div>
-        <h1 className="page-title">Home</h1>
-        <SkeletonPlaceholder style={{ width: "100%", height: "8rem", marginBottom: "1.5rem" }} />
-        <SkeletonText paragraph lineCount={4} />
+      <div className="space-y-8">
+        <PageHeader title={`${TAX_YEAR} overview`} />
+        <StatGrid>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </StatGrid>
+        <div className="grid gap-6 lg:grid-cols-5">
+          <Skeleton className="h-64 rounded-xl lg:col-span-2" />
+          <Skeleton className="h-64 rounded-xl lg:col-span-3" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <h1 className="page-title">Home</h1>
-        <InlineNotification kind="error" title="Could not load your data" subtitle={error} lowContrast />
+      <div className="space-y-6">
+        <PageHeader title={`${TAX_YEAR} overview`} />
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">{error}</CardContent>
+        </Card>
       </div>
     );
   }
 
-  const tiles = [
-    { label: `${TAX_YEAR} expenses`, value: formatCurrency(expensesTotal, currency) },
-    { label: `${TAX_YEAR} income`, value: formatCurrency(income, currency) },
-    { label: "Net", value: formatCurrency(net, currency) },
-    { label: "Receipts", value: String(receiptCount) },
-  ];
+  const addButton = (
+    <Button asChild>
+      <Link href="/transactions?add=1">
+        <Plus />
+        Add transaction
+      </Link>
+    </Button>
+  );
 
   return (
-    <div>
-      <h1 className="page-title">Home</h1>
+    <div className="space-y-8">
+      <PageHeader
+        title={`${TAX_YEAR} overview`}
+        description="Your income, expenses, and receipts at a glance."
+      >
+        {addButton}
+      </PageHeader>
 
-      <div className="tile-grid">
-        {tiles.map((t) => (
-          <ClickableTile key={t.label} href="/transactions">
-            <div className="stat-tile__label">{t.label}</div>
-            <div className="stat-tile__value">{t.value}</div>
-          </ClickableTile>
-        ))}
+      <StatGrid>
+        <StatCard
+          label="Expenses"
+          value={formatCurrency(expensesTotal, currency)}
+          icon={ArrowUpRight}
+          emphasis
+          href="/transactions"
+        />
+        <StatCard
+          label="Income"
+          value={formatCurrency(income, currency)}
+          icon={ArrowDownLeft}
+          href="/transactions"
+        />
+        <StatCard
+          label="Net"
+          value={formatCurrency(net, currency)}
+          icon={Scale}
+          tone={net >= 0 ? "success" : "destructive"}
+          href="/transactions"
+        />
+        <StatCard
+          label="Receipts"
+          value={String(receiptCount)}
+          icon={Receipt}
+          href="/transactions"
+        />
+      </StatGrid>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Spending by category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {byCategory.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No expenses recorded for {TAX_YEAR} yet.
+              </p>
+            ) : (
+              <CategoryBreakdown data={byCategory} currency={currency} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Recent activity</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/transactions">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {recent.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title="No transactions yet"
+                description="Add your first expense or income and it will show up here."
+                action={addButton}
+              />
+            ) : (
+              <TransactionList expenses={recent} currency={currency} />
+            )}
+          </CardContent>
+        </Card>
       </div>
-
-      <section className="section">
-        <h2>Spending by category</h2>
-        {byCategory.length === 0 ? (
-          <p>No expenses recorded for {TAX_YEAR} yet.</p>
-        ) : (
-          <DonutChart
-            data={byCategory}
-            options={{
-              resizable: true,
-              height: "320px",
-              donut: { center: { label: "Expenses" } },
-            }}
-          />
-        )}
-      </section>
-
-      <section className="section">
-        <h2>Recent activity</h2>
-        {recent.length === 0 ? (
-          <p>No transactions yet.</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {recent.map((e) => (
-              <li
-                key={e.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "0.75rem 0",
-                  borderBottom: "1px solid var(--cds-border-subtle)",
-                }}
-              >
-                <Link href="/transactions" style={{ textDecoration: "none" }}>
-                  {e.title || e.category}
-                  <span style={{ color: "var(--cds-text-secondary)", marginLeft: "0.5rem" }}>
-                    {new Date(e.created_at).toLocaleDateString()}
-                  </span>
-                </Link>
-                <span style={{ color: isIncome(e) ? "var(--cds-support-success)" : undefined }}>
-                  {isIncome(e) ? "+" : "−"}
-                  {formatCurrency(amountOf(e), currency)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Button kind="ghost" href="/transactions" as={Link} style={{ marginTop: "0.5rem" }}>
-          View all transactions
-        </Button>
-      </section>
     </div>
   );
 }

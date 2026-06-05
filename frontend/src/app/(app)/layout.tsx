@@ -1,123 +1,44 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  Header,
-  HeaderName,
-  HeaderGlobalBar,
-  HeaderGlobalAction,
-  SideNav,
-  SideNavItems,
-  SideNavLink,
-  Theme,
-} from "@carbon/react";
-import { Dashboard, Receipt, Settings, Help, Logout } from "@carbon/icons-react";
-import { BRAND } from "@/lib/brand";
-import { api } from "@/lib/api";
-import SupportModal from "@/components/SupportModal";
-import "@carbon/charts/styles.css";
-
-interface NavDest {
-  label: string;
-  href: string;
-  icon: typeof Dashboard;
-}
-
-const DESTINATIONS: NavDest[] = [
-  { label: "Home", href: "/home", icon: Dashboard },
-  { label: "Transactions", href: "/transactions", icon: Receipt },
-  { label: "Settings", href: "/settings", icon: Settings },
-];
+import { useEffect, useState, type ReactNode } from "react";
+import { api, type UserProfile } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { AppSidebar } from "@/components/app-sidebar";
+import { MobileBottomNav, MobileTopBar } from "@/components/mobile-nav";
+import { SupportDialog } from "@/components/support-dialog";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
+  const { session } = useSession();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    api.users
+      .getById(session.userId)
+      .then((p) => active && setProfile(p))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
-  async function handleLogout() {
-    await api.auth.logout().catch(() => {});
-    router.push("/login");
-  }
+  const name = profile ? `${profile.fname} ${profile.sname}`.trim() : undefined;
+  const email = profile?.email;
+  const onSupport = () => setSupportOpen(true);
 
   return (
-    <Theme theme="white" className="app-shell">
-      <Header aria-label={`${BRAND} navigation`}>
-        <HeaderName href="/home" prefix="">
-          {BRAND}
-        </HeaderName>
-        <HeaderGlobalBar>
-          <HeaderGlobalAction
-            aria-label="Support"
-            onClick={() => setSupportOpen(true)}
-          >
-            <Help size={20} />
-          </HeaderGlobalAction>
-          <HeaderGlobalAction aria-label="Log out" onClick={handleLogout}>
-            <Logout size={20} />
-          </HeaderGlobalAction>
-        </HeaderGlobalBar>
-      </Header>
+    <div className="min-h-dvh">
+      <AppSidebar name={name} email={email} onSupport={onSupport} />
+      <MobileTopBar name={name} email={email} onSupport={onSupport} />
 
-      <SideNav
-        aria-label="Side navigation"
-        isPersistent
-        expanded
-        isChildOfHeader={false}
-      >
-        <SideNavItems>
-          {DESTINATIONS.map(({ label, href, icon }) => (
-            <SideNavLink
-              key={href}
-              as={Link}
-              href={href}
-              renderIcon={icon}
-              isActive={isActive(href)}
-            >
-              {label}
-            </SideNavLink>
-          ))}
-          <SideNavLink
-            renderIcon={Help}
-            onClick={() => setSupportOpen(true)}
-            href="#support"
-          >
-            Support
-          </SideNavLink>
-        </SideNavItems>
-      </SideNav>
+      <main className="px-4 pb-24 pt-5 sm:px-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-9">
+        <div className="mx-auto w-full max-w-5xl">{children}</div>
+      </main>
 
-      <main className="app-content">{children}</main>
-
-      {/* Mobile bottom navigation */}
-      <nav className="bottom-nav" aria-label="Primary">
-        {DESTINATIONS.map(({ label, href, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`bottom-nav__item${
-              isActive(href) ? " bottom-nav__item--active" : ""
-            }`}
-          >
-            <Icon size={20} />
-            {label}
-          </Link>
-        ))}
-        <button
-          type="button"
-          className="bottom-nav__item"
-          onClick={() => setSupportOpen(true)}
-        >
-          <Help size={20} />
-          Support
-        </button>
-      </nav>
-
-      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
-    </Theme>
+      <MobileBottomNav onSupport={onSupport} />
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} userEmail={email} />
+    </div>
   );
 }

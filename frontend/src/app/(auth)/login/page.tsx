@@ -3,16 +3,19 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { TextInput, PasswordInput, Button, InlineNotification, Tile } from "@carbon/react";
 import { api } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -23,47 +26,62 @@ export default function LoginPage() {
       router.push("/home");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Sign in failed");
       setLoading(false);
     }
   }
 
   return (
-    <div className="auth-page">
-      <Tile className="auth-card">
-        <h1 style={{ marginBottom: "1.5rem" }}>Sign in to {BRAND}</h1>
-        <form onSubmit={handleSubmit}>
-          {error && (
-            <InlineNotification kind="error" title="Sign in failed" subtitle={error} lowContrast />
-          )}
-          <TextInput
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">Sign in to your {BRAND} account.</p>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        {error && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+            {error}
+          </p>
+        )}
+        <Field label="Email" htmlFor="email">
+          <Input
             id="email"
-            labelText="Email"
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            autoComplete="email"
           />
-          <PasswordInput
+        </Field>
+        <Field label="Password" htmlFor="password">
+          <Input
             id="password"
-            labelText="Password"
+            type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            autoComplete="current-password"
           />
-          <Button type="submit" disabled={loading} style={{ width: "100%", maxWidth: "100%" }}>
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-        <p style={{ marginTop: "1rem" }}>
-          Don&apos;t have an account? <Link href="/signup">Sign up</Link>
-        </p>
-        <p>
-          <Link href="/forgot-password">Forgot password?</Link>
-        </p>
-      </Tile>
+        </Field>
+        <div className="flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading && <Spinner />}
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="font-medium text-primary hover:underline">
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }

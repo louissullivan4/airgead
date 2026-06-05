@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Class-based dark mode. Tokens for dark are authored below but not shipped as
+   the default yet — add `class="dark"` on <html> to enable. */
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Semantic CSS vars in :root / .dark, mapped into Tailwind's
+   theme via @theme inline so utilities like bg-card / text-muted-foreground /
+   rounded-lg resolve from them.
+--------------------------------------------------------------------------- */
+:root {
+  --radius: 0.75rem;
+
+  --background: #ffffff;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --primary: #8a3ffc;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #27272a;
+
+  --success: #059669;
+  --success-foreground: #ffffff;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #8a3ffc;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+
+  --card: #101013;
+  --card-foreground: #fafafa;
+
+  --popover: #101013;
+  --popover-foreground: #fafafa;
+
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+
+  --primary: #a07cff;
+  --primary-foreground: #1a1626;
+
+  --secondary: #1c1c20;
+  --secondary-foreground: #fafafa;
+
+  --accent: #1c1c20;
+  --accent-foreground: #fafafa;
+
+  --success: #34d399;
+  --success-foreground: #052e1f;
+
+  --destructive: #f87171;
+  --destructive-foreground: #1f0a0a;
+
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #a07cff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Native-app feel when launched from the home screen. */
+  @media (display-mode: standalone) {
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+}

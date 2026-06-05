@@ -2,8 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { TextInput, Button, InlineNotification, Tile } from "@carbon/react";
+import { MailCheck } from "lucide-react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,45 +23,63 @@ export default function ForgotPasswordPage() {
       await api.users.requestPasswordReset(email);
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <div className="auth-page">
-      <Tile className="auth-card">
-        <h1 style={{ marginBottom: "1.5rem" }}>Reset your password</h1>
-        {sent ? (
-          <InlineNotification
-            kind="success"
-            title="Check your email"
-            subtitle="If an account exists for that address, a reset link is on its way."
-            lowContrast
-            hideCloseButton
-          />
-        ) : (
-          <form onSubmit={handleSubmit}>
-            {error && <InlineNotification kind="error" title="Error" subtitle={error} lowContrast />}
-            <TextInput
-              id="email"
-              labelText="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-            <Button type="submit" disabled={loading} style={{ width: "100%", maxWidth: "100%" }}>
-              {loading ? "Sending…" : "Send reset link"}
-            </Button>
-          </form>
-        )}
-        <p style={{ marginTop: "1rem" }}>
-          <Link href="/login">Back to sign in</Link>
+  if (sent) {
+    return (
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-success/10">
+          <MailCheck className="size-6 text-success" />
+        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          If an account exists for {email}, a reset link is on its way.
         </p>
-      </Tile>
+        <Button asChild variant="outline" className="mt-8 w-full">
+          <Link href="/login">Back to sign in</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Reset your password</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Enter your email and we&apos;ll send you a reset link.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        {error && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+            {error}
+          </p>
+        )}
+        <Field label="Email" htmlFor="email">
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </Field>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading && <Spinner />}
+          {loading ? "Sending…" : "Send reset link"}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <Link href="/login" className="font-medium text-primary hover:underline">
+          Back to sign in
+        </Link>
+      </p>
     </div>
   );
 }

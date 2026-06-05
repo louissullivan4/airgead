@@ -1,55 +1,54 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
-  DataTable,
-  Table,
-  TableHead,
-  TableRow,
-  TableHeader,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableToolbar,
-  TableToolbarContent,
-  TableToolbarSearch,
-  Pagination,
-  OverflowMenu,
-  OverflowMenuItem,
-  Button,
-  Dropdown,
-  DataTableSkeleton,
-  InlineNotification,
-  Modal,
-} from "@carbon/react";
-import { Add, Download } from "@carbon/icons-react";
-import {
-  api,
-  amountOf,
-  isIncome,
-  formatCurrency,
-  type Expense,
-  type UserProfile,
-} from "@/lib/api";
+  Download,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Receipt,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { api, amountOf, isIncome, type Expense, type UserProfile } from "@/lib/api";
 import { useSession } from "@/lib/session";
-import TransactionFormModal from "@/components/TransactionFormModal";
-import ReceiptThumb from "@/components/ReceiptThumb";
+import { PageHeader } from "@/components/page-header";
+import { TransactionsTable, type SortKey } from "@/components/transactions-table";
+import { TransactionList } from "@/components/transaction-list";
+import { TransactionFormDialog } from "@/components/transaction-form-dialog";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const TYPE_FILTERS = ["All", "Expenses", "Income"] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
-
 const TAX_YEAR = new Date().getFullYear();
 
-const HEADERS = [
-  { key: "title", header: "Title" },
-  { key: "category", header: "Category" },
-  { key: "date", header: "Date" },
-  { key: "amount", header: "Amount" },
-  { key: "receipt", header: "Receipt" },
-  { key: "actions", header: "" },
-];
-
-export default function TransactionsPage() {
+function TransactionsInner() {
+  const searchParams = useSearchParams();
   const { session, loading: sessionLoading } = useSession();
   const [all, setAll] = useState<Expense[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -57,14 +56,16 @@ export default function TransactionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [addOpen, setAddOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [deleting, setDeleting] = useState<Expense | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const currency = profile?.currency ?? "EUR";
 
@@ -72,7 +73,6 @@ export default function TransactionsPage() {
     setLoading(true);
     try {
       const data = await api.expenses.getByUserId(userId);
-      data.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
       setAll(data);
       setError(null);
     } catch (err) {
@@ -92,38 +92,76 @@ export default function TransactionsPage() {
     api.users.getById(session.userId).then(setProfile).catch(() => {});
   }, [session, sessionLoading, load]);
 
-  // Phase 2 swaps this for a camera-first capture flow — keep the trigger isolated.
-  const onAddTransaction = () => {
+  // PWA shortcut / dashboard deep-link: /transactions?add=1 opens the add dialog.
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setEditing(null);
+      setDialogOpen(true);
+    }
+  }, [searchParams]);
+
+  const openAdd = () => {
     setEditing(null);
-    setAddOpen(true);
+    setDialogOpen(true);
+  };
+  const openEdit = (e: Expense) => {
+    setEditing(e);
+    setDialogOpen(true);
+  };
+
+  const onSort = (key: SortKey) => {
+    if (key === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(key === "date" ? "desc" : "asc");
+    }
   };
 
   const filtered = useMemo(() => {
-    if (typeFilter === "Income") return all.filter(isIncome);
-    if (typeFilter === "Expenses") return all.filter((e) => !isIncome(e));
-    return all;
-  }, [all, typeFilter]);
+    let list = all;
+    if (typeFilter === "Income") list = list.filter(isIncome);
+    else if (typeFilter === "Expenses") list = list.filter((e) => !isIncome(e));
 
-  const lookup = useMemo(() => new Map(filtered.map((e) => [e.id, e])), [filtered]);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (e) =>
+          (e.title ?? "").toLowerCase().includes(q) ||
+          e.category.toLowerCase().includes(q) ||
+          (e.description ?? "").toLowerCase().includes(q),
+      );
+    }
 
-  const rows = useMemo(
-    () =>
-      filtered.map((e) => ({
-        id: e.id,
-        title: e.title || "(untitled)",
-        category: e.category,
-        date: e.created_at,
-        amount: amountOf(e),
-        receipt: e.receipt_image_url ? "1" : "",
-        actions: "",
-      })),
-    [filtered],
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "title") cmp = (a.title || "").localeCompare(b.title || "");
+      else if (sortKey === "category") cmp = a.category.localeCompare(b.category);
+      else if (sortKey === "amount") cmp = amountOf(a) - amountOf(b);
+      else cmp = +new Date(a.created_at) - +new Date(b.created_at);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [all, typeFilter, search, sortKey, sortDir]);
+
+  const total = filtered.length;
+  const visible = useMemo(
+    () => filtered.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize),
+    [filtered, page, pageSize],
   );
+
+  // Reset to the first page whenever the result set changes shape.
+  useEffect(() => {
+    setPage(1);
+  }, [typeFilter, search, pageSize]);
+
+  // Clamp if the current page falls past the end (e.g. after a delete).
+  useEffect(() => {
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    if (page > pageCount) setPage(pageCount);
+  }, [total, pageSize, page]);
 
   async function handleExport() {
     if (!session) return;
     setExporting(true);
-    setNotice(null);
     try {
       const blob = await api.expenses.downloadZip(session.userId, TAX_YEAR);
       const url = URL.createObjectURL(blob);
@@ -135,7 +173,7 @@ export default function TransactionsPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Export failed");
+      toast.error(err instanceof Error ? err.message : "Export failed");
     } finally {
       setExporting(false);
     }
@@ -143,207 +181,168 @@ export default function TransactionsPage() {
 
   async function confirmDelete() {
     if (!deleting) return;
+    const target = deleting;
+    setDeleting(null);
     try {
-      await api.expenses.delete(deleting.id);
-      setDeleting(null);
+      await api.expenses.delete(target.id);
+      toast.success("Transaction deleted");
       if (session) void load(session.userId);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : "Delete failed");
     }
   }
 
-  if (loading || sessionLoading) {
-    return (
-      <div>
-        <h1 className="page-title">Transactions</h1>
-        <DataTableSkeleton columnCount={5} rowCount={8} showHeader={false} />
-      </div>
-    );
-  }
+  const rowMenu = (e: Expense) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+          <MoreHorizontal />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => openEdit(e)}>
+          <Pencil />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(e)}>
+          <Trash2 />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
-  if (error) {
-    return (
-      <div>
-        <h1 className="page-title">Transactions</h1>
-        <InlineNotification kind="error" title="Could not load transactions" subtitle={error} lowContrast />
-      </div>
-    );
-  }
+  const filtering = Boolean(search) || typeFilter !== "All";
 
   return (
-    <div>
-      <h1 className="page-title">Transactions</h1>
+    <div className="space-y-6">
+      <PageHeader title="Transactions" description="Every expense and income entry.">
+        <Button variant="outline" onClick={handleExport} disabled={exporting}>
+          {exporting ? <Spinner /> : <Download />}
+          {exporting ? "Exporting…" : "Export"}
+        </Button>
+        <Button onClick={openAdd}>
+          <Plus />
+          Add
+        </Button>
+      </PageHeader>
 
-      {notice && (
-        <InlineNotification
-          kind="error"
-          title="Error"
-          subtitle={notice}
-          lowContrast
-          onCloseButtonClick={() => setNotice(null)}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search transactions"
+            className="pl-9"
+          />
+        </div>
+        <Segmented
+          value={typeFilter}
+          onValueChange={setTypeFilter}
+          aria-label="Filter by type"
+          options={TYPE_FILTERS.map((t) => ({ label: t, value: t }))}
         />
+      </div>
+
+      {loading || sessionLoading ? (
+        <Card className="space-y-3 p-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-lg" />
+          ))}
+        </Card>
+      ) : error ? (
+        <Card className="p-10 text-center text-sm text-destructive">{error}</Card>
+      ) : total === 0 ? (
+        <EmptyState
+          icon={Receipt}
+          title={filtering ? "No matching transactions" : "No transactions yet"}
+          description={
+            filtering
+              ? "Try clearing your search or filter."
+              : "Add your first expense or income to get started."
+          }
+          action={
+            filtering ? undefined : (
+              <Button onClick={openAdd}>
+                <Plus />
+                Add transaction
+              </Button>
+            )
+          }
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="hidden lg:block">
+            <TransactionsTable
+              expenses={visible}
+              currency={currency}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={onSort}
+              onEdit={openEdit}
+              onDelete={setDeleting}
+            />
+          </div>
+          <div className="px-2 lg:hidden">
+            <TransactionList
+              expenses={visible}
+              currency={currency}
+              onSelect={openEdit}
+              renderAction={rowMenu}
+            />
+          </div>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </Card>
       )}
 
-      <DataTable rows={rows} headers={HEADERS} isSortable>
-        {({ rows: dtRows, headers, getHeaderProps, getRowProps, getTableProps, onInputChange }) => {
-          const start = (page - 1) * pageSize;
-          const visible = dtRows.slice(start, start + pageSize);
-          return (
-            <TableContainer>
-              <TableToolbar>
-                <TableToolbarContent>
-                  <TableToolbarSearch
-                    persistent
-                    placeholder="Search transactions"
-                    onChange={(e) => {
-                      setPage(1);
-                      onInputChange(e as React.ChangeEvent<HTMLInputElement>);
-                    }}
-                  />
-                  <Dropdown
-                    id="type-filter"
-                    size="lg"
-                    type="inline"
-                    label="Type"
-                    titleText=""
-                    items={[...TYPE_FILTERS]}
-                    selectedItem={typeFilter}
-                    onChange={({ selectedItem }) => {
-                      setTypeFilter((selectedItem as TypeFilter) ?? "All");
-                      setPage(1);
-                    }}
-                    style={{ minWidth: "10rem" }}
-                  />
-                  <Button
-                    kind="ghost"
-                    renderIcon={Download}
-                    onClick={handleExport}
-                    disabled={exporting}
-                  >
-                    {exporting ? "Exporting…" : "Export"}
-                  </Button>
-                  <Button renderIcon={Add} onClick={onAddTransaction}>
-                    Add
-                  </Button>
-                </TableToolbarContent>
-              </TableToolbar>
-              <Table {...getTableProps()}>
-                <TableHead>
-                  <TableRow>
-                    {headers.map((header) => {
-                      const { key, ...headerProps } = getHeaderProps({ header });
-                      return (
-                        <TableHeader key={header.key} {...headerProps}>
-                          {header.header}
-                        </TableHeader>
-                      );
-                    })}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {visible.map((row) => {
-                    const expense = lookup.get(row.id);
-                    const { key, ...rowProps } = getRowProps({ row });
-                    return (
-                      <TableRow key={row.id} {...rowProps}>
-                        {row.cells.map((cell) => {
-                          const header = cell.info.header;
-                          if (header === "amount" && expense) {
-                            return (
-                              <TableCell key={cell.id}>
-                                {isIncome(expense) ? "+" : "−"}
-                                {formatCurrency(Number(cell.value), currency)}
-                              </TableCell>
-                            );
-                          }
-                          if (header === "date") {
-                            return (
-                              <TableCell key={cell.id}>
-                                {new Date(cell.value).toLocaleDateString()}
-                              </TableCell>
-                            );
-                          }
-                          if (header === "receipt") {
-                            return (
-                              <TableCell key={cell.id}>
-                                <ReceiptThumb expenseId={row.id} hasReceipt={cell.value === "1"} />
-                              </TableCell>
-                            );
-                          }
-                          if (header === "actions") {
-                            return (
-                              <TableCell key={cell.id}>
-                                <OverflowMenu aria-label="Row actions" flipped size="sm">
-                                  <OverflowMenuItem
-                                    itemText="Edit"
-                                    onClick={() => {
-                                      if (expense) {
-                                        setEditing(expense);
-                                        setAddOpen(true);
-                                      }
-                                    }}
-                                  />
-                                  <OverflowMenuItem
-                                    isDelete
-                                    itemText="Delete"
-                                    onClick={() => expense && setDeleting(expense)}
-                                  />
-                                </OverflowMenu>
-                              </TableCell>
-                            );
-                          }
-                          return <TableCell key={cell.id}>{cell.value}</TableCell>;
-                        })}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              {dtRows.length === 0 && (
-                <p style={{ padding: "1.5rem" }}>
-                  No transactions{typeFilter !== "All" ? ` of type "${typeFilter}"` : ""} yet.
-                </p>
-              )}
-              <Pagination
-                totalItems={dtRows.length}
-                page={page}
-                pageSize={pageSize}
-                pageSizes={[10, 25, 50]}
-                onChange={({ page: p, pageSize: ps }) => {
-                  setPage(p);
-                  setPageSize(ps);
-                }}
-              />
-            </TableContainer>
-          );
-        }}
-      </DataTable>
-
-      <TransactionFormModal
-        open={addOpen}
+      <TransactionFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         expense={editing}
         defaultCurrency={currency}
-        onClose={() => {
-          setAddOpen(false);
-          setEditing(null);
-        }}
         onSaved={() => session && load(session.userId)}
       />
 
-      <Modal
-        open={Boolean(deleting)}
-        danger
-        modalHeading="Delete transaction"
-        primaryButtonText="Delete"
-        secondaryButtonText="Cancel"
-        onRequestClose={() => setDeleting(null)}
-        onSecondarySubmit={() => setDeleting(null)}
-        onRequestSubmit={confirmDelete}
-      >
-        <p>
-          Delete &ldquo;{deleting?.title || deleting?.category}&rdquo;? This cannot be undone.
-        </p>
-      </Modal>
+      <AlertDialog open={Boolean(deleting)} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete &ldquo;{deleting?.title || deleting?.category}&rdquo;? This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={<TransactionsFallback />}>
+      <TransactionsInner />
+    </Suspense>
+  );
+}
+
+function TransactionsFallback() {
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Transactions" />
+      <Skeleton className="h-96 rounded-xl" />
     </div>
   );
 }
