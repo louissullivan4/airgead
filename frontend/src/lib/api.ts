@@ -122,6 +122,26 @@ export const api = {
     downloadZip: (id: string, year: string | number) =>
       requestBlob(`/expenses/downloads/${id}/${year}`),
   },
+  receipts: {
+    /** Clean + store a captured image; returns the receipt id + signed image URL. */
+    process: (imageDataUrl: string) =>
+      request<ReceiptProcessResult>("/receipts/process", {
+        method: "POST",
+        body: JSON.stringify({ image: imageDataUrl }),
+      }),
+    /** Create one or more expense line items linked to a receipt. */
+    createExpenses: (receiptId: string, items: ReceiptLineItemInput[]) =>
+      request<Expense[]>(`/receipts/${receiptId}/expenses`, {
+        method: "POST",
+        body: JSON.stringify({ items }),
+      }),
+    /** Fresh short-lived signed URL for the receipt image. */
+    getImageUrl: (receiptId: string) =>
+      request<{ url: string }>(`/receipts/${receiptId}/image-url`),
+    /** Receipt plus its linked expense line items. */
+    get: (receiptId: string) =>
+      request<Receipt & { expenses: Expense[] }>(`/receipts/${receiptId}`),
+  },
   organisations: {
     get: (id: string) => request<Organisation>(`/organisations/${id}`),
     /** Effective category tree for the org plus the pristine type `defaults`. */
@@ -168,8 +188,71 @@ export interface Expense {
   amount: string | number; // Postgres NUMERIC arrives as a string
   currency: string;
   receipt_image_url: string | null;
+  /** Set when this line item was captured from a shared receipt (Phase 2). */
+  receipt_id: string | null;
+  merchant_name: string | null;
+  tax_amount: string | number | null;
   created_at: string;
   updated_at: string;
+}
+
+// --- Receipts (Phase 2 camera-first capture) -------------------------------
+
+/** Per-field OCR confidence (0..1). Drives the dormant auto-fill UI. */
+export interface ReceiptFieldConfidence {
+  merchant?: number;
+  date?: number;
+  total?: number;
+  tax?: number;
+  currency?: number;
+}
+
+/** Parsed receipt data. Null on the live flow today (OCR is disabled). */
+export interface ReceiptParsed {
+  merchant: string | null;
+  date: string | null;
+  total: number | null;
+  tax: number | null;
+  currency: string | null;
+  lineItems?: { description: string; amount: number; category?: string }[];
+  fieldConfidence?: ReceiptFieldConfidence;
+}
+
+/** A stored receipt row (returned by GET /receipts/:id). */
+export interface Receipt {
+  id: string;
+  user_id: string;
+  image_object_path: string | null;
+  parsed_data: ReceiptParsed | null;
+  ocr_confidence: string | number | null;
+  receipt_status: "pending" | "reviewed" | "none";
+  merchant_name: string | null;
+  receipt_date: string | null;
+  total_amount: string | number | null;
+  tax_amount: string | number | null;
+  currency: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Response of POST /receipts/process. `parsedData` is null while OCR is off. */
+export interface ReceiptProcessResult {
+  receiptId: string;
+  signedUrl: string;
+  parsedData: ReceiptParsed | null;
+  ocrConfidence: number | null;
+  receiptStatus: string;
+}
+
+/** One expense line item posted to POST /receipts/:id/expenses. */
+export interface ReceiptLineItemInput {
+  title?: string;
+  description?: string;
+  category: string;
+  amount: number;
+  currency?: string;
+  merchant_name?: string;
+  tax_amount?: number;
 }
 
 export interface CreateExpenseData {

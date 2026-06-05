@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Receipt } from "lucide-react";
 import { amountOf, isIncome, type Expense } from "@/lib/api";
 import { categoryMeta } from "@/lib/categories";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ function formatDate(value: string) {
 function TransactionRow({ expense, currency, onClick, action }: TransactionRowProps) {
   const income = isIncome(expense);
   const meta = categoryMeta(expense.category);
+  const hasReceipt = Boolean(expense.receipt_id) || Boolean(expense.receipt_image_url);
   const Body = onClick ? "button" : "div";
 
   return (
@@ -34,8 +36,19 @@ function TransactionRow({ expense, currency, onClick, action }: TransactionRowPr
       >
         <CategoryIcon category={expense.category} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{expense.title || meta.label}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium">
+              {expense.title || expense.merchant_name || meta.label}
+            </span>
+            {hasReceipt && (
+              <Receipt
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-label="Has receipt"
+              />
+            )}
+          </div>
           <div className="truncate text-xs text-muted-foreground">
+            {expense.merchant_name && expense.title ? `${expense.merchant_name} · ` : ""}
             {meta.label} · {formatDate(expense.created_at)}
           </div>
         </div>

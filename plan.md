@@ -24,15 +24,19 @@ Phase 1 — Signup paths & UI rework (the phase you're on)
 [KEEP] Express API, JWT issuance (gf.js), Cloud Run deploy, Postgres.
 [KEEP / optional KILL] Expo repo — keep only if you still want native builds; otherwise retire once PWA ships.
 
-Phase 2 — Camera-first capture + receipt cleanup + OCR auto-fill
-(Your new features. Pipeline order: capture → crop → binarise → OCR → compress → store.)
+Phase 2 — Camera-first capture + receipt cleanup (+ OCR auto-fill, built-but-dormant)
+(Pipeline order: capture → [crop: deferred] → binarise → [OCR: mock-only, flag-gated] → compress → store.)
+Shipping default is MANUAL entry: capture + clean + store a cheap image, user fills the fields.
+The "numbers read for you" OCR magic is deliberately deferred (no paid provider, no API key) until validated.
+See docs/phase-2-capture.md for the full pipeline, model, endpoints, and the flags to switch OCR on later.
 
-[NEW] Add-expense flow opens camera immediately; "Skip photo" falls back to the blank manual form.
-[NEW] Edge detection + perspective crop — detect receipt quadrilateral, deskew (OpenCV findContours + warpPerspective, server-side or WASM client-side).
-[NEW] Binarisation — adaptive threshold to 1-bit black/white document. This is the "remove background noise" feature and slashes file size.
-[NEW] OCR adapter interface — pluggable; first implementation a hosted API (Veryfi/Tabscanner/Eagle Doc/Azure). Returns merchant, date, total, tax, currency.
-[NEW] Auto-fill form from OCR JSON with per-field confidence indicators; user edits anything wrong before saving. Store raw OCR result in a parsed_data JSONB column for audit/reprocessing.
-[REWORK] expenses table — add merchant_name, tax_amount, parsed_data (jsonb), receipt_status ('pending'|'reviewed').
+[DONE] Add-expense flow opens the camera immediately (native <input capture>); "Skip photo" falls back to the blank manual form (unchanged behaviour).
+[DEFERRED] Edge detection + perspective crop — no-op seam + TODO in receiptCleanup.js (OpenCV findContours + warpPerspective). Deferred to avoid a finicky native dep on node:20-alpine; a missed crop beats one that cuts off the total.
+[DONE] Binarisation — sharp grayscale + adaptive threshold to a 1-bit black/white PNG. Removes background noise and slashes file size; this cleaned image is what gets stored.
+[DONE] Receipts ↔ expenses split — new receipts table; one receipt → many expense line items (expenses.receipt_id, nullable). Manual no-photo expenses still allowed; legacy receipt_image_url kept for backward compat.
+[DONE/DORMANT] OCR adapter seam — OcrProvider interface + MockOcrProvider (only impl) + HostedOcrProvider stub (Veryfi/Tabscanner/Eagle Doc/Azure, EU residency). getOcrProvider() reads OCR_PROVIDER (default 'none' = disabled). Not wired into the live flow.
+[DONE/DORMANT] Auto-fill form from OCR JSON with per-field confidence indicators — coded behind OCR_AUTOFILL_ENABLED / NEXT_PUBLIC_OCR_AUTOFILL_ENABLED (default false). raw OCR result reserved in receipts.parsed_data (jsonb). Off = the user just types.
+[DONE] receipts table carries merchant_name, tax_amount, parsed_data (jsonb), ocr_confidence, receipt_status ('pending'|'reviewed'|'none', default 'reviewed'); expenses gain receipt_id, merchant_name, tax_amount.
 
 Phase 3 — Storage cost optimisation
 

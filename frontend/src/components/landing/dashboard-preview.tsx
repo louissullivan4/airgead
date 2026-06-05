@@ -20,6 +20,9 @@ function sample(
     amount,
     currency: "EUR",
     receipt_image_url: null,
+    receipt_id: null,
+    merchant_name: null,
+    tax_amount: null,
     created_at: `${date}T10:00:00.000Z`,
     updated_at: `${date}T10:00:00.000Z`,
   };

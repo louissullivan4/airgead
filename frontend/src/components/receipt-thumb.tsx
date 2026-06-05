@@ -6,27 +6,37 @@ import { cn } from "@/lib/utils";
 
 interface ReceiptThumbProps {
   expenseId: string;
+  /** True when the expense carries its own (legacy) receipt_image_url. */
   hasReceipt: boolean;
+  /** Set when the expense is a line item of a shared, captured receipt (Phase 2). */
+  receiptId?: string | null;
   className?: string;
 }
 
-/** Lazily resolves a short-lived signed URL and shows the receipt thumbnail. */
-function ReceiptThumb({ expenseId, hasReceipt, className }: ReceiptThumbProps) {
+/**
+ * Lazily resolves a short-lived signed URL and shows the receipt thumbnail.
+ * Prefers the shared receipt image (Phase 2 `receipt_id`) when present, falling
+ * back to the legacy per-expense `receipt_image_url`.
+ */
+function ReceiptThumb({ expenseId, hasReceipt, receiptId, className }: ReceiptThumbProps) {
   const [url, setUrl] = useState<string | null>(null);
+  const present = Boolean(receiptId) || hasReceipt;
 
   useEffect(() => {
-    if (!hasReceipt) return;
+    if (!present) return;
     let active = true;
-    api.expenses
-      .getReceiptUrl(expenseId)
+    const fetchUrl = receiptId
+      ? api.receipts.getImageUrl(receiptId)
+      : api.expenses.getReceiptUrl(expenseId);
+    fetchUrl
       .then((r) => active && setUrl(r.url))
       .catch(() => active && setUrl(null));
     return () => {
       active = false;
     };
-  }, [expenseId, hasReceipt]);
+  }, [expenseId, receiptId, present]);
 
-  if (!hasReceipt) {
+  if (!present) {
     return <span className={cn("text-muted-foreground/50", className)}>—</span>;
   }
   if (!url) {

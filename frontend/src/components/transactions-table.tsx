@@ -80,7 +80,12 @@ function TransactionsTable({
         {expenses.map((e) => (
           <tr key={e.id} className="border-b border-border/60 transition-colors hover:bg-accent/40">
             <td className="max-w-0 truncate px-3 py-3 font-medium">
-              {e.title || categoryMeta(e.category).label}
+              {e.title || e.merchant_name || categoryMeta(e.category).label}
+              {e.merchant_name && e.title && (
+                <span className="block truncate text-xs font-normal text-muted-foreground">
+                  {e.merchant_name}
+                </span>
+              )}
             </td>
             <td className="px-3 py-3">
               <CategoryBadge category={e.category} />
@@ -89,7 +94,11 @@ function TransactionsTable({
               {new Date(e.created_at).toLocaleDateString()}
             </td>
             <td className="px-3 py-3">
-              <ReceiptThumb expenseId={e.id} hasReceipt={Boolean(e.receipt_image_url)} />
+              <ReceiptThumb
+                expenseId={e.id}
+                hasReceipt={Boolean(e.receipt_image_url)}
+                receiptId={e.receipt_id}
+              />
             </td>
             <td className="whitespace-nowrap px-3 py-3 text-right">
               <Amount value={amountOf(e)} currency={currency} income={isIncome(e)} />

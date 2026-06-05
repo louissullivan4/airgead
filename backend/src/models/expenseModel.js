@@ -19,10 +19,13 @@ const orgPredicate = (alias, orgId, paramIndex) => {
 
 const createExpense = async (pool, expense) => {
     try {
-        const { user_id, title, description, category, amount, currency, receipt_image_url } = expense;
+        const { user_id, title, description, category, amount, currency, receipt_image_url,
+            receipt_id, merchant_name, tax_amount } = expense;
         const result = await pool.query(
-            'INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [user_id, title, description, category, amount, currency, receipt_image_url]
+            `INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url, receipt_id, merchant_name, tax_amount)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [user_id, title, description, category, amount, currency, receipt_image_url,
+                receipt_id || null, merchant_name || null, tax_amount ?? null]
         );
         logger.info('Expense created successfully', { user_id, title });
         return result.rows[0];
@@ -99,6 +102,25 @@ const getExpenseByCategory = async (pool, id, category, orgId) => {
 };
 
 
+// All expense line items captured from a single receipt, org-scoped. Used by the
+// receipt detail endpoint (GET /receipts/:id) to return a receipt + its lines.
+const getExpensesByReceiptId = async (pool, receiptId, orgId) => {
+    try {
+        const org = orgPredicate('', orgId, 2);
+        const values = org.usesParam ? [receiptId, orgId] : [receiptId];
+        const result = await pool.query(
+            `SELECT * FROM expenses WHERE receipt_id = $1${org.sql} ORDER BY created_at ASC`,
+            values
+        );
+        logger.info('Fetched expenses by receipt ID', { receiptId });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching expenses by receipt ID', { receiptId, error: error.message });
+        throw error;
+    }
+};
+
+
 const getExpensesByUserIdAndYear = async (pool, user_id, year, orgId) => {
     try {
         const startDate = `${year}-01-01`;
@@ -125,12 +147,14 @@ const getExpensesByUserIdAndYear = async (pool, user_id, year, orgId) => {
 
 const updateExpense = async (pool, id, expense, orgId) => {
     try {
-        const { title, description, category, amount, currency, receipt_image_url } = expense;
-        const org = orgPredicate('', orgId, 8);
-        const baseValues = [title, description, category, amount, currency, receipt_image_url, id];
+        const { title, description, category, amount, currency, receipt_image_url,
+            merchant_name, tax_amount } = expense;
+        const org = orgPredicate('', orgId, 10);
+        const baseValues = [title, description, category, amount, currency, receipt_image_url,
+            merchant_name ?? null, tax_amount ?? null, id];
         const values = org.usesParam ? [...baseValues, orgId] : baseValues;
         const result = await pool.query(
-            `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7${org.sql} RETURNING *`,
+            `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, merchant_name = $7, tax_amount = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9${org.sql} RETURNING *`,
             values
         );
         if (result.rows.length > 0) {
@@ -148,22 +172,28 @@ const updateExpense = async (pool, id, expense, orgId) => {
 
 const partialUpdateExpense = async (pool, id, expense, updateImage, orgId) => {
     try {
-        const { title, description, category, amount, currency, receipt_image_url } = expense;
+        const { title, description, category, amount, currency, receipt_image_url,
+            merchant_name, tax_amount } = expense;
+        // merchant_name/tax_amount use COALESCE so a PATCH that omits them (e.g.
+        // legacy single-expense edits) preserves the existing values instead of
+        // nulling them.
         if (!updateImage) {
-            const org = orgPredicate('', orgId, 7);
-            const baseValues = [title, description, category, amount, currency, id];
+            const org = orgPredicate('', orgId, 9);
+            const baseValues = [title, description, category, amount, currency,
+                merchant_name ?? null, tax_amount ?? null, id];
             const values = org.usesParam ? [...baseValues, orgId] : baseValues;
             const result = await pool.query(
-                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6${org.sql} RETURNING *`,
+                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, merchant_name = COALESCE($6, merchant_name), tax_amount = COALESCE($7, tax_amount), updated_at = CURRENT_TIMESTAMP WHERE id = $8${org.sql} RETURNING *`,
                 values
             );
             return result.rows[0];
         } else {
-            const org = orgPredicate('', orgId, 8);
-            const baseValues = [title, description, category, amount, currency, receipt_image_url, id];
+            const org = orgPredicate('', orgId, 10);
+            const baseValues = [title, description, category, amount, currency, receipt_image_url,
+                merchant_name ?? null, tax_amount ?? null, id];
             const values = org.usesParam ? [...baseValues, orgId] : baseValues;
             const result = await pool.query(
-                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7${org.sql} RETURNING *`,
+                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, merchant_name = COALESCE($7, merchant_name), tax_amount = COALESCE($8, tax_amount), updated_at = CURRENT_TIMESTAMP WHERE id = $9${org.sql} RETURNING *`,
                 values
             );
             return result.rows[0];
@@ -201,5 +231,6 @@ module.exports = {
     deleteExpense,
     getExpensesByUserIdAndYear,
     getExpensesByUserIdNoIncome,
+    getExpensesByReceiptId,
     partialUpdateExpense
 };

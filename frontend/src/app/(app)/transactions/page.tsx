@@ -12,12 +12,20 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, amountOf, isIncome, type Expense, type UserProfile } from "@/lib/api";
+import {
+  api,
+  amountOf,
+  isIncome,
+  type Expense,
+  type ReceiptProcessResult,
+  type UserProfile,
+} from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { TransactionsTable, type SortKey } from "@/components/transactions-table";
 import { TransactionList } from "@/components/transaction-list";
 import { TransactionFormDialog } from "@/components/transaction-form-dialog";
+import { ReceiptCaptureDialog } from "@/components/receipt-capture-dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +75,10 @@ function TransactionsInner() {
   const [deleting, setDeleting] = useState<Expense | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Camera-first add flow: the capture step runs before the form opens.
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [pendingReceipt, setPendingReceipt] = useState<ReceiptProcessResult | null>(null);
+
   const currency = profile?.currency ?? "EUR";
 
   const load = useCallback(async (userId: string) => {
@@ -92,20 +104,40 @@ function TransactionsInner() {
     api.users.getById(session.userId).then(setProfile).catch(() => {});
   }, [session, sessionLoading, load]);
 
-  // PWA shortcut / dashboard deep-link: /transactions?add=1 opens the add dialog.
+  // PWA shortcut / dashboard deep-link: /transactions?add=1 opens the add flow
+  // (starting at the camera capture step).
   useEffect(() => {
     if (searchParams.get("add") === "1") {
       setEditing(null);
-      setDialogOpen(true);
+      setPendingReceipt(null);
+      setCaptureOpen(true);
     }
   }, [searchParams]);
 
+  // Add starts at the camera capture step; editing opens the form directly.
   const openAdd = () => {
     setEditing(null);
-    setDialogOpen(true);
+    setPendingReceipt(null);
+    setCaptureOpen(true);
   };
   const openEdit = (e: Expense) => {
     setEditing(e);
+    setPendingReceipt(null);
+    setDialogOpen(true);
+  };
+
+  // Capture step resolved: skip -> blank manual form; captured -> form prefilled
+  // with the cleaned receipt + (dormant) parsed data.
+  const onSkipPhoto = () => {
+    setCaptureOpen(false);
+    setPendingReceipt(null);
+    setEditing(null);
+    setDialogOpen(true);
+  };
+  const onCaptured = (result: ReceiptProcessResult) => {
+    setCaptureOpen(false);
+    setEditing(null);
+    setPendingReceipt(result);
     setDialogOpen(true);
   };
 
@@ -302,11 +334,21 @@ function TransactionsInner() {
         </Card>
       )}
 
+      <ReceiptCaptureDialog
+        open={captureOpen}
+        onOpenChange={setCaptureOpen}
+        onSkip={onSkipPhoto}
+        onCaptured={onCaptured}
+      />
+
       <TransactionFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         expense={editing}
         defaultCurrency={currency}
+        receiptId={pendingReceipt?.receiptId ?? null}
+        receiptImageUrl={pendingReceipt?.signedUrl ?? null}
+        parsed={pendingReceipt?.parsedData ?? null}
         onSaved={() => session && load(session.userId)}
       />
 

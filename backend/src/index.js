@@ -1,6 +1,7 @@
 const express = require('express');
 const userRoutes = require('./routes/userRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const receiptRoutes = require('./routes/receiptRoutes');
 const organisationRoutes = require('./routes/organisationRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const path = require('path');
@@ -33,6 +34,7 @@ app.get('/', (req, res) => {
 
 app.use('/users', userRoutes);
 app.use('/expenses', expenseRoutes);
+app.use('/receipts', receiptRoutes);
 app.use('/organisations', organisationRoutes);
 app.use('/files', fileRoutes);
 

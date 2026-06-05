@@ -83,14 +83,33 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS receipts (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id            uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    image_object_path  text,
+    parsed_data        jsonb,
+    ocr_confidence     numeric,
+    receipt_status     text NOT NULL DEFAULT 'reviewed' CHECK (receipt_status IN ('pending','reviewed','none')),
+    merchant_name      text,
+    receipt_date       date,
+    total_amount       numeric,
+    tax_amount         numeric,
+    currency           text,
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS expenses (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id            uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receipt_id         uuid REFERENCES receipts(id) ON DELETE SET NULL,
     title              text,
     description        text,
     category           text,
     amount             numeric(12,2) NOT NULL DEFAULT 0,
     currency           text NOT NULL DEFAULT 'EUR',
+    merchant_name      text,
+    tax_amount         numeric,
     receipt_image_url  text,
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now()
@@ -115,6 +134,8 @@ END$$;
 
 CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_receipt_id ON expenses(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
 `;
 
 // A spread of demo transactions across the current calendar (tax) year.
