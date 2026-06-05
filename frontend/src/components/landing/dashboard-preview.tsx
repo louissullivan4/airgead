@@ -45,7 +45,7 @@ function DashboardPreview() {
     <div className="rounded-2xl border border-border bg-card p-3 shadow-2xl shadow-primary/10 sm:p-4">
       <div className="space-y-4">
         <StatGrid>
-          <StatCard label="Expenses" value="€1,066" emphasis />
+          <StatCard label="Expenses" value="€1,066" />
           <StatCard label="Income" value="€1,200" />
           <StatCard label="Net" value="€134" tone="success" />
           <StatCard label="Receipts" value="18" />

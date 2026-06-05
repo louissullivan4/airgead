@@ -33,11 +33,17 @@ services:
       # Defaults target the postgres service above; override via backend/.env.
       DB_URL: ${DB_URL:-postgres://postgres:postgres@postgres:5432/equiledger}
       JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me}
+      # Receipt images: store on the local filesystem (mounted ./backend/temp)
+      # instead of GCS. Override STORAGE_DRIVER=gcs in prod.
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      LOCAL_STORAGE_DIR: /usr/src/app/temp/receipts
+      PUBLIC_BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:8080}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./backend:/usr/src/app
+      - ./backend/temp:/usr/src/app/temp
       - backend_modules:/usr/src/app/node_modules
     command: npm run dev
 

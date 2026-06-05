@@ -4,12 +4,12 @@ const fs = require('fs-extra');
 const path = require('path');
 const archiver = require('archiver');
 const logger = require('../utils/logger');
-const { getBucket } = require('../utils/gcs');
+const storage = require('../utils/storage');
 
-// Convert a stored receipt reference into a GCS object path. New rows store the
-// object path directly (e.g. "org_<id>/2026/abc.jpg" or legacy "ids/abc.jpg").
+// Convert a stored receipt reference into a storage object key. New rows store
+// the object key directly (e.g. "org_<id>/2026/abc.jpg" or legacy "ids/abc.jpg").
 // Pre-migration-004 rows still hold a full public URL; strip the scheme/host/
-// bucket prefix to recover the object path.
+// bucket prefix to recover the object key.
 const toObjectPath = (stored) => {
     if (/^https?:\/\//.test(stored)) {
         const withoutQuery = stored.split('?')[0];
@@ -30,17 +30,15 @@ const downloadImages = async (expenses, imagesDir) => {
             const imageName = `expense_${expense.id}${imageExtension}`;
             const imagePath = path.join(imagesDir, imageName);
 
-            const file = getBucket().file(objectPath);
-
             try {
-                const [exists] = await file.exists();
+                const exists = await storage.exists(objectPath);
                 if (!exists) {
-                    logger.warn(`File ${objectPath} does not exist in bucket.`);
+                    logger.warn(`Receipt ${objectPath} does not exist in storage.`);
                     expense.local_image_path = null;
                     return;
                 }
 
-                const readStream = file.createReadStream();
+                const readStream = storage.createReadStream(objectPath);
 
                 await fs.ensureDir(path.dirname(imagePath));
 

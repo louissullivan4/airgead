@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, type UserProfile } from "@/lib/api";
+import { api, type Organisation, type UserProfile } from "@/lib/api";
 import { CURRENCIES } from "@/lib/categories";
+import { COUNTRIES, ORG_CATEGORIES } from "@/lib/org";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
+import { OrgCategoriesEditor } from "@/components/org-categories-editor";
 import {
   Card,
   CardContent,
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 
 const PERSONAL_FIELDS = [
   { key: "fname", label: "First name" },
@@ -52,6 +55,11 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [org, setOrg] = useState<Organisation | null>(null);
+  const [orgForm, setOrgForm] = useState<Partial<Organisation>>({});
+  const [orgSaving, setOrgSaving] = useState(false);
+  const isOwner = session?.orgRole === "owner";
+
   useEffect(() => {
     if (sessionLoading) return;
     if (!session) {
@@ -73,8 +81,53 @@ export default function SettingsPage() {
     };
   }, [session, sessionLoading]);
 
+  useEffect(() => {
+    if (sessionLoading || !session) return;
+    let active = true;
+    api.organisations
+      .get(session.orgId)
+      .then((o) => {
+        if (!active) return;
+        setOrg(o);
+        setOrgForm(o);
+      })
+      .catch((err) => active && toast.error(err instanceof Error ? err.message : "Failed to load organisation"));
+    return () => {
+      active = false;
+    };
+  }, [session, sessionLoading]);
+
   function update(key: keyof UserProfile, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function updateOrg(key: keyof Organisation, value: string) {
+    setOrgForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleOrgSave() {
+    if (!session || !org) return;
+    setOrgSaving(true);
+    try {
+      // Keep the coarse `type` consistent with the chosen business type.
+      const org_category = orgForm.org_category ?? org.org_category;
+      const type = org_category !== "personal" ? "business" : "personal";
+      const updated = await api.organisations.update(session.orgId, {
+        name: orgForm.name ?? org.name,
+        description: orgForm.description ?? "",
+        country: orgForm.country ?? org.country,
+        vat_number: orgForm.vat_number ?? "",
+        org_category,
+        type,
+      });
+      setOrg(updated);
+      setOrgForm(updated);
+      toast.success("Organisation saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save organisation");
+    } finally {
+      setOrgSaving(false);
+    }
   }
 
   async function handleSave() {
@@ -167,6 +220,116 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {session && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Organisation</CardTitle>
+            <CardDescription>
+              {isOwner
+                ? "Your business details and the type that tailors your categories."
+                : "Your organisation details. Only the owner can edit these."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Organisation name" htmlFor="org-name">
+                <Input
+                  id="org-name"
+                  value={orgForm.name ?? ""}
+                  disabled={!isOwner}
+                  onChange={(e) => updateOrg("name", e.target.value)}
+                />
+              </Field>
+              <Field label="Business type" htmlFor="org-category">
+                <Select
+                  value={orgForm.org_category ?? "personal"}
+                  disabled={!isOwner}
+                  onValueChange={(v) => updateOrg("org_category", v)}
+                >
+                  <SelectTrigger id="org-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORG_CATEGORIES.map((c) => (
+                      <SelectItem key={c.slug} value={c.slug}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <Field label="Description" htmlFor="org-description">
+              <Textarea
+                id="org-description"
+                rows={2}
+                value={orgForm.description ?? ""}
+                disabled={!isOwner}
+                onChange={(e) => updateOrg("description", e.target.value)}
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Country" htmlFor="org-country">
+                <Select
+                  value={orgForm.country ?? "IE"}
+                  disabled={!isOwner}
+                  onValueChange={(v) => updateOrg("country", v)}
+                >
+                  <SelectTrigger id="org-country">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              {(orgForm.country ?? "IE") === "IE" && (
+                <Field label="VAT number" htmlFor="org-vat" hint="Optional">
+                  <Input
+                    id="org-vat"
+                    value={orgForm.vat_number ?? ""}
+                    disabled={!isOwner}
+                    onChange={(e) => updateOrg("vat_number", e.target.value)}
+                    placeholder="IE1234567T"
+                  />
+                </Field>
+              )}
+            </div>
+            {isOwner && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Changing your business type won&apos;t rewrite past transactions. Use “Reset to
+                  defaults” under Categories to load this type&apos;s category list.
+                </p>
+                <Button onClick={handleOrgSave} disabled={orgSaving}>
+                  {orgSaving && <Spinner />}
+                  {orgSaving ? "Saving…" : "Save organisation"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {session && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Categories</CardTitle>
+            <CardDescription>
+              The expense and income categories shown when you add a transaction. Add your own and
+              group them with subcategories.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OrgCategoriesEditor orgId={session.orgId} canEdit={!!isOwner} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

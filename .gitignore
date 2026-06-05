@@ -41,6 +41,9 @@ Thumbs.db
 src/uploads/
 src/middlewares/uploads/
 src/temp/
+# Local receipt storage + export scratch (keep the dir, ignore contents)
+backend/temp/*
+!backend/temp/.gitkeep
 backups/
 sa-key.json
 restore_command.txt

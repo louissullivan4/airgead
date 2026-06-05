@@ -9,7 +9,9 @@ import {
   type CreateExpenseData,
   type Expense,
 } from "@/lib/api";
-import { categoryMeta, CURRENCIES, EXPENSE_CATEGORIES } from "@/lib/categories";
+import { CURRENCIES } from "@/lib/categories";
+import { categoryOptions, firstLeafSlug } from "@/lib/org";
+import { useOrgCategories } from "@/lib/use-org-categories";
 import {
   Dialog,
   DialogClose,
@@ -25,7 +27,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -49,9 +53,11 @@ function TransactionFormDialog({
   onSaved,
 }: TransactionFormDialogProps) {
   const editing = Boolean(expense);
+  const { tree } = useOrgCategories();
+  const expenseOptions = categoryOptions(tree, "expense");
   const [type, setType] = useState<"expense" | "income">("expense");
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(defaultCurrency);
   const [description, setDescription] = useState("");
@@ -65,20 +71,28 @@ function TransactionFormDialog({
       const income = isIncome(expense);
       setType(income ? "income" : "expense");
       setTitle(expense.title ?? "");
-      setCategory(income ? EXPENSE_CATEGORIES[0] : expense.category);
       setAmount(String(amountOf(expense)));
       setCurrency(expense.currency || defaultCurrency);
       setDescription(expense.description ?? "");
     } else {
       setType("expense");
       setTitle("");
-      setCategory(EXPENSE_CATEGORIES[0]);
       setAmount("");
       setCurrency(defaultCurrency);
       setDescription("");
     }
     setImage(undefined);
   }, [open, expense, defaultCurrency]);
+
+  // Seed the expense category from the org's tree (separate effect so a late
+  // category fetch doesn't wipe other in-progress fields). Income uses the
+  // 'income' sentinel and has no category picker.
+  useEffect(() => {
+    if (!open) return;
+    setCategory(
+      expense && !isIncome(expense) ? expense.category : firstLeafSlug(tree, "expense"),
+    );
+  }, [open, expense, tree]);
 
   async function submit() {
     const numeric = Number(amount);
@@ -143,14 +157,25 @@ function TransactionFormDialog({
             <Field label="Category" htmlFor="tx-category">
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger id="tx-category">
-                  <SelectValue />
+                  <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {EXPENSE_CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {categoryMeta(c).label}
-                    </SelectItem>
-                  ))}
+                  {expenseOptions.map((opt) =>
+                    opt.kind === "group" ? (
+                      <SelectGroup key={opt.label}>
+                        <SelectLabel>{opt.label}</SelectLabel>
+                        {opt.items.map((it) => (
+                          <SelectItem key={it.slug} value={it.slug} className="pl-10">
+                            {it.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : (
+                      <SelectItem key={opt.slug} value={opt.slug}>
+                        {opt.label}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </Field>

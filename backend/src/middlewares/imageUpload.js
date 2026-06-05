@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { v4: uuidv4 } = require('uuid');
-const { getBucket } = require('../utils/gcs');
+const storage = require('../utils/storage');
 const logger = require('../utils/logger');
 
 const uploadBase64Image = async (req, res, next) => {
@@ -48,28 +48,12 @@ const uploadBase64Image = async (req, res, next) => {
             objectPath = `ids/${receiptId}.${imageType}`;
         }
 
-        const file = getBucket().file(objectPath);
+        await storage.putObject(objectPath, imageBuffer, matches[1]);
 
-        const stream = file.createWriteStream({
-            metadata: {
-                contentType: matches[1],
-            },
-            resumable: false,
-        });
-
-        stream.on('error', (err) => {
-            logger.error('Error uploading image to GCS: %s', err.message);
-            return res.status(500).json({ error: 'Failed to upload image. Please try again later.' });
-        });
-
-        stream.on('finish', () => {
-            // Objects are PRIVATE now (no makePublic). Store the object path —
-            // not a public URL. Reads go through signed URLs (see signedUrl.js).
-            req.body.image = objectPath;
-            next();
-        });
-
-        stream.end(imageBuffer);
+        // Store the object path — not a public URL. Objects are private; reads
+        // go through short-lived signed URLs (see signedUrl.js / storage.js).
+        req.body.image = objectPath;
+        next();
     } catch (error) {
         logger.error('Error processing image upload: %s', error.message);
         res.status(500).json({ error: 'Failed to process image upload. Please try again later.' });

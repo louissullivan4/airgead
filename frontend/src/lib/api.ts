@@ -122,6 +122,18 @@ export const api = {
     downloadZip: (id: string, year: string | number) =>
       requestBlob(`/expenses/downloads/${id}/${year}`),
   },
+  organisations: {
+    get: (id: string) => request<Organisation>(`/organisations/${id}`),
+    /** Effective category tree for the org plus the pristine type `defaults`. */
+    getCategories: (id: string) =>
+      request<OrgCategoriesResponse>(`/organisations/${id}/categories`),
+    /** Owner-only partial update of org profile and/or the category tree. */
+    update: (id: string, data: Partial<OrganisationInput> & { categories?: CategoryTree }) =>
+      request<Organisation>(`/organisations/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -193,6 +205,58 @@ export interface RegisterData {
   currency: string;
   /** Invite token from the email link; omit for self-serve signup. */
   token?: string;
+  /** Optional org-creation step (self-serve only). Omit to get an auto-named personal org. */
+  organisation?: OrganisationInput;
+}
+
+/** Fields a user may set when creating or editing their organisation. */
+export interface OrganisationInput {
+  name: string;
+  description?: string;
+  country?: string;
+  vat_number?: string;
+  /** Derived from org_category on the backend when omitted. */
+  type?: "personal" | "business";
+  org_category?: string;
+}
+
+/** Organisation row returned by the backend. */
+export interface Organisation {
+  id: string;
+  name: string;
+  type: "personal" | "business";
+  description?: string | null;
+  country?: string;
+  vat_number?: string | null;
+  org_category: string;
+  categories?: CategoryTree | null;
+  owner_account_id?: string | null;
+  subscription_level?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** A node in the org category tree. A leaf (no children) is what gets stored on a transaction. */
+export interface CategoryNode {
+  slug: string;
+  label: string;
+  children?: CategoryNode[];
+}
+
+export interface CategoryTree {
+  expense: CategoryNode[];
+  income: CategoryNode[];
+}
+
+/** Response of GET /organisations/:id/categories. */
+export interface OrgCategoriesResponse {
+  orgCategory: string;
+  /** Effective tree: the org's stored custom tree, or the type template. */
+  categories: CategoryTree;
+  /** True when the org has a stored (edited) tree. */
+  isCustom: boolean;
+  /** Pristine template for the org's type, for "Reset to defaults". */
+  defaults: CategoryTree;
 }
 
 export interface UserProfile {

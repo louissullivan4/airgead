@@ -1,6 +1,8 @@
 const express = require('express');
 const userRoutes = require('./routes/userRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const organisationRoutes = require('./routes/organisationRoutes');
+const fileRoutes = require('./routes/fileRoutes');
 const path = require('path');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
@@ -31,6 +33,8 @@ app.get('/', (req, res) => {
 
 app.use('/users', userRoutes);
 app.use('/expenses', expenseRoutes);
+app.use('/organisations', organisationRoutes);
+app.use('/files', fileRoutes);
 
 app.use((err, req, res, next) => {
     logger.error('Unhandled error: ', err);

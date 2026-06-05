@@ -36,6 +36,9 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+echo "▶ Running database migrations…"
+docker compose exec -T backend npm run migrate:up
+
 echo "▶ Seeding demo data…"
 docker compose exec -T backend npm run seed
 
