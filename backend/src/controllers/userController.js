@@ -16,6 +16,31 @@ const { isSuperAdmin } = require('../middlewares/tenantScope');
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
 
+// Shared invite email sender for both invite kinds (member + client). Keeps the
+// Gmail transport config in one place. Throws on send failure so callers decide
+// how to respond.
+const sendInviteEmail = async (email, inviteLink) => {
+    const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.EMAIL_USERNAME,
+            pass: process.env.EMAIL_PASSWORD,
+        },
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USERNAME,
+        to: email,
+        subject: 'You have been invited to create an account!',
+        text: `You have been invited to create an account with ${BRAND}. Click the link to create your account: ${inviteLink}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+};
+
 const createUser = async (req, res) => {
     try {
         const token = gf.extractToken(req);
@@ -232,6 +257,18 @@ const login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password.' });
         }
 
+        // Phase 4: a suspended user, or a member of a suspended org, cannot log
+        // in (super_admin suspends for e.g. non-payment; reactivation restores).
+        if (user.account_status === 'suspended') {
+            logger.warn('Login blocked for suspended user: %s', email);
+            return res.status(403).json({ error: 'This account has been suspended. Please contact support.' });
+        }
+        const loginOrg = user.org_id ? await organisationModel.getOrgById(req.pool, user.org_id) : null;
+        if (loginOrg && loginOrg.status === 'suspended') {
+            logger.warn('Login blocked for suspended org: %s', loginOrg.id);
+            return res.status(403).json({ error: 'This organisation has been suspended. Please contact support.' });
+        }
+
         const token = gf.generateJwtToken(user);
 
         logger.info('User logged in successfully: ', {
@@ -308,14 +345,31 @@ const register = async (req, res) => {
 
     let mode = 'self';
     let inviterId = null;
+    let accountantOrgId = null;
+    let createdBy = null;
     if (token) {
         try {
             const decoded = jwt.verify(token, jwtSecret);
             if (decoded.email && decoded.email !== email) {
                 return res.status(400).json({ error: 'Invite is for a different email address.' });
             }
-            inviterId = decoded.inviter_id || null;
-            mode = 'invite';
+            if (decoded.kind === 'client') {
+                // Client invite: the invitee creates their OWN isolated org
+                // (mode stays 'self'); we link it to the inviting practice so
+                // the accountant gets read access without joining the org.
+                accountantOrgId = decoded.accountant_org_id || null;
+                createdBy = decoded.created_by || null;
+            } else if (decoded.kind === 'platform') {
+                // Super-admin platform invite: the invitee creates their OWN org
+                // (mode stays 'self'). 'accountant' invites flag it as a firm.
+                if (decoded.is_accountant_practice) {
+                    req.body.organisation = { ...(req.body.organisation || {}), is_accountant_practice: true };
+                }
+            } else {
+                // Member invite: join the inviter's existing org.
+                inviterId = decoded.inviter_id || null;
+                mode = 'invite';
+            }
         } catch (error) {
             logger.warn('Invalid invite token on register: %s', error.message);
             return res.status(400).json({ error: 'Invalid or expired invite token.' });
@@ -333,6 +387,8 @@ const register = async (req, res) => {
             user: { ...req.body, password: passwordHash },
             mode,
             inviterId,
+            accountantOrgId,
+            createdBy,
         });
 
         const newToken = gf.generateJwtToken(newUser);
@@ -475,31 +531,7 @@ const inviteUser = async (req, res) => {
 
         const inviteLink = `${frontendURL}/signup?token=${inviteToken}`;
 
-        const transporter = nodemailer.createTransport({
-            service: "Gmail",
-            host: "smtp.gmail.com",
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL_USERNAME,
-                pass: process.env.EMAIL_PASSWORD,
-            },
-        });
-
-        const mailOptions = {
-            from: process.env.EMAIL_USERNAME,
-            to: email,
-            subject: 'You have been invited to create an account!',
-            text: `You have been invited to create an account with ${BRAND}. Click the link to create your account: ${inviteLink}`,
-        };
-
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                logger.error("Error sending email: ", error);
-            } else {
-                logger.info("Email sent: ", info.response);
-            }
-        });
+        await sendInviteEmail(email, inviteLink);
 
         logger.info('Invitation email sent to: %s', email);
         res.status(200).json({ message: 'Invitation email sent successfully.' });
@@ -598,5 +630,6 @@ module.exports = {
     inviteUser,
     dashboardLogin,
     getAssignedUsers,
-    sendSupportEmail
+    sendSupportEmail,
+    sendInviteEmail,
 };

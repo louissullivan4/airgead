@@ -20,12 +20,15 @@ const orgPredicate = (alias, orgId, paramIndex) => {
 const createExpense = async (pool, expense) => {
     try {
         const { user_id, title, description, category, amount, currency, receipt_image_url,
-            receipt_id, merchant_name, tax_amount } = expense;
+            receipt_id, merchant_name, tax_amount, created_at } = expense;
+        // created_at doubles as the transaction date (it drives display, sorting
+        // and the tax-year report). COALESCE lets callers set it explicitly while
+        // falling back to now() when omitted.
         const result = await pool.query(
-            `INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url, receipt_id, merchant_name, tax_amount)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            `INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url, receipt_id, merchant_name, tax_amount, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11::timestamptz, now())) RETURNING *`,
             [user_id, title, description, category, amount, currency, receipt_image_url,
-                receipt_id || null, merchant_name || null, tax_amount ?? null]
+                receipt_id || null, merchant_name || null, tax_amount ?? null, created_at || null]
         );
         logger.info('Expense created successfully', { user_id, title });
         return result.rows[0];
@@ -121,6 +124,44 @@ const getExpensesByReceiptId = async (pool, receiptId, orgId) => {
 };
 
 
+// Phase 3 org-level reads. A client org may have several members, so the
+// accountant workspace needs all of an org's line items (not one user's). These
+// scope on the user -> org relationship, the same join the orgPredicate uses.
+const getExpensesByOrgId = async (pool, orgId) => {
+    try {
+        const result = await pool.query(
+            `SELECT * FROM expenses
+             WHERE user_id IN (SELECT id FROM users WHERE org_id = $1)
+             ORDER BY updated_at DESC`,
+            [orgId]
+        );
+        logger.info('Fetched expenses for org', { orgId });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching expenses by org ID', { orgId, error: error.message });
+        throw error;
+    }
+};
+
+const getExpensesByOrgIdAndYear = async (pool, orgId, year) => {
+    try {
+        const startDate = `${year}-01-01`;
+        const endDate = `${parseInt(year, 10) + 1}-01-01`;
+        const result = await pool.query(
+            `SELECT * FROM expenses
+             WHERE user_id IN (SELECT id FROM users WHERE org_id = $1)
+               AND created_at >= $2 AND created_at < $3
+             ORDER BY updated_at DESC`,
+            [orgId, startDate, endDate]
+        );
+        logger.info('Fetched expenses for org and year', { orgId, year });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching expenses by org ID and year', { orgId, year, error: error.message });
+        throw error;
+    }
+};
+
 const getExpensesByUserIdAndYear = async (pool, user_id, year, orgId) => {
     try {
         const startDate = `${year}-01-01`;
@@ -173,27 +214,27 @@ const updateExpense = async (pool, id, expense, orgId) => {
 const partialUpdateExpense = async (pool, id, expense, updateImage, orgId) => {
     try {
         const { title, description, category, amount, currency, receipt_image_url,
-            merchant_name, tax_amount } = expense;
-        // merchant_name/tax_amount use COALESCE so a PATCH that omits them (e.g.
-        // legacy single-expense edits) preserves the existing values instead of
-        // nulling them.
+            merchant_name, tax_amount, created_at } = expense;
+        // merchant_name/tax_amount/created_at use COALESCE so a PATCH that omits
+        // them (e.g. legacy single-expense edits) preserves the existing values
+        // instead of nulling them. created_at doubles as the transaction date.
         if (!updateImage) {
-            const org = orgPredicate('', orgId, 9);
+            const org = orgPredicate('', orgId, 10);
             const baseValues = [title, description, category, amount, currency,
-                merchant_name ?? null, tax_amount ?? null, id];
+                merchant_name ?? null, tax_amount ?? null, created_at || null, id];
             const values = org.usesParam ? [...baseValues, orgId] : baseValues;
             const result = await pool.query(
-                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, merchant_name = COALESCE($6, merchant_name), tax_amount = COALESCE($7, tax_amount), updated_at = CURRENT_TIMESTAMP WHERE id = $8${org.sql} RETURNING *`,
+                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, merchant_name = COALESCE($6, merchant_name), tax_amount = COALESCE($7, tax_amount), created_at = COALESCE($8::timestamptz, created_at), updated_at = CURRENT_TIMESTAMP WHERE id = $9${org.sql} RETURNING *`,
                 values
             );
             return result.rows[0];
         } else {
-            const org = orgPredicate('', orgId, 10);
+            const org = orgPredicate('', orgId, 11);
             const baseValues = [title, description, category, amount, currency, receipt_image_url,
-                merchant_name ?? null, tax_amount ?? null, id];
+                merchant_name ?? null, tax_amount ?? null, created_at || null, id];
             const values = org.usesParam ? [...baseValues, orgId] : baseValues;
             const result = await pool.query(
-                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, merchant_name = COALESCE($7, merchant_name), tax_amount = COALESCE($8, tax_amount), updated_at = CURRENT_TIMESTAMP WHERE id = $9${org.sql} RETURNING *`,
+                `UPDATE expenses SET title = $1, description = $2, category = $3, amount = $4, currency = $5, receipt_image_url = $6, merchant_name = COALESCE($7, merchant_name), tax_amount = COALESCE($8, tax_amount), created_at = COALESCE($9::timestamptz, created_at), updated_at = CURRENT_TIMESTAMP WHERE id = $10${org.sql} RETURNING *`,
                 values
             );
             return result.rows[0];
@@ -232,5 +273,7 @@ module.exports = {
     getExpensesByUserIdAndYear,
     getExpensesByUserIdNoIncome,
     getExpensesByReceiptId,
+    getExpensesByOrgId,
+    getExpensesByOrgIdAndYear,
     partialUpdateExpense
 };

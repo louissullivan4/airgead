@@ -3,6 +3,8 @@ const userRoutes = require('./routes/userRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const receiptRoutes = require('./routes/receiptRoutes');
 const organisationRoutes = require('./routes/organisationRoutes');
+const accountantRoutes = require('./routes/accountantRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const path = require('path');
 const logger = require('./utils/logger');
@@ -36,6 +38,8 @@ app.use('/users', userRoutes);
 app.use('/expenses', expenseRoutes);
 app.use('/receipts', receiptRoutes);
 app.use('/organisations', organisationRoutes);
+app.use('/accountant', accountantRoutes);
+app.use('/admin', adminRoutes);
 app.use('/files', fileRoutes);
 
 app.use((err, req, res, next) => {

@@ -49,6 +49,9 @@ export default function LandingPage() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5">
           <Logo href="/" />
           <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link href="/signup">For accountants</Link>
+            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href="/login">Log in</Link>
             </Button>
@@ -127,6 +130,10 @@ export default function LandingPage() {
               <h2 className="text-3xl font-semibold tracking-tight">
                 From receipt to records in three steps
               </h2>
+              <p className="mt-3 text-muted-foreground">
+                Managing a whole client book? Accountants get every client&apos;s records in one place,
+                ready to export at tax time.
+              </p>
             </div>
             <div className="mt-12 grid gap-8 sm:grid-cols-3">
               {STEPS.map(({ n, title, body }) => (

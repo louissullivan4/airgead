@@ -39,6 +39,7 @@ function SignupForm() {
   const [orgCountry, setOrgCountry] = useState(DEFAULT_COUNTRY);
   const [orgVat, setOrgVat] = useState("");
   const [orgCategory, setOrgCategory] = useState("");
+  const [isPractice, setIsPractice] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -58,6 +59,7 @@ function SignupForm() {
               vat_number:
                 orgCountry === "IE" && orgVat.trim() ? orgVat.trim() : undefined,
               org_category: orgCategory || undefined,
+              is_accountant_practice: isPractice || undefined,
             }
           : undefined;
       await api.auth.register({
@@ -154,6 +156,25 @@ function SignupForm() {
 
             {showOrg && (
               <div className="mt-4 space-y-4">
+                <label
+                  htmlFor="org-practice"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 p-3"
+                >
+                  <input
+                    id="org-practice"
+                    type="checkbox"
+                    checked={isPractice}
+                    onChange={(e) => setIsPractice(e.target.checked)}
+                    className="mt-0.5 size-4 accent-primary"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">This is an accountancy practice</span>
+                    <span className="block text-xs text-muted-foreground">
+                      I manage other people&apos;s books. Unlocks the Clients workspace to invite and
+                      oversee client organisations.
+                    </span>
+                  </span>
+                </label>
                 <Field label="Organisation name" htmlFor="org-name">
                   <Input
                     id="org-name"

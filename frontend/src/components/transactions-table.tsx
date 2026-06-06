@@ -31,8 +31,10 @@ interface TransactionsTableProps {
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
-  onEdit: (expense: Expense) => void;
-  onDelete: (expense: Expense) => void;
+  onEdit?: (expense: Expense) => void;
+  onDelete?: (expense: Expense) => void;
+  /** Hide the row-action column (accountant client view is view-only). */
+  readOnly?: boolean;
 }
 
 function TransactionsTable({
@@ -43,6 +45,7 @@ function TransactionsTable({
   onSort,
   onEdit,
   onDelete,
+  readOnly = false,
 }: TransactionsTableProps) {
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ChevronsUpDown className="size-3.5 opacity-50" />;
@@ -73,7 +76,7 @@ function TransactionsTable({
           <th className="px-3 py-2.5 text-right text-xs">
             <span className="inline-flex justify-end">{headerButton("Amount", "amount")}</span>
           </th>
-          <th className="w-10 px-3 py-2.5" />
+          {!readOnly && <th className="w-10 px-3 py-2.5" />}
         </tr>
       </thead>
       <tbody>
@@ -103,25 +106,27 @@ function TransactionsTable({
             <td className="whitespace-nowrap px-3 py-3 text-right">
               <Amount value={amountOf(e)} currency={currency} income={isIncome(e)} />
             </td>
-            <td className="px-3 py-3 text-right">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label="Row actions">
-                    <MoreHorizontal />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => onEdit(e)}>
-                    <Pencil />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive" onSelect={() => onDelete(e)}>
-                    <Trash2 />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </td>
+            {!readOnly && (
+              <td className="px-3 py-3 text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => onEdit?.(e)}>
+                      <Pencil />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onSelect={() => onDelete?.(e)}>
+                      <Trash2 />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            )}
           </tr>
         ))}
       </tbody>

@@ -2,26 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { House, LifeBuoy, Receipt, Settings } from "lucide-react";
+import { Briefcase, House, LifeBuoy, Receipt, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { UserMenu } from "./user-menu";
-
-const NAV = [
-  { label: "Home", href: "/home", icon: House },
-  { label: "Transactions", href: "/transactions", icon: Receipt },
-  { label: "Settings", href: "/settings", icon: Settings },
-];
 
 interface AppSidebarProps {
   name?: string;
   email?: string;
   onSupport: () => void;
+  /** Accountancy practice (or super_admin): show the Clients workspace. */
+  showClients?: boolean;
+  /** Business-org owner: show the Team management tab. */
+  showTeam?: boolean;
+  /** Platform super_admin: show the Admin dashboard. */
+  showAdmin?: boolean;
 }
 
-function AppSidebar({ name, email, onSupport }: AppSidebarProps) {
+function AppSidebar({ name, email, onSupport, showClients, showTeam, showAdmin }: AppSidebarProps) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  const nav = [
+    { label: "Home", href: "/home", icon: House },
+    { label: "Transactions", href: "/transactions", icon: Receipt },
+    ...(showClients ? [{ label: "Clients", href: "/clients", icon: Briefcase }] : []),
+    ...(showTeam ? [{ label: "Team", href: "/team", icon: UsersRound }] : []),
+    ...(showAdmin ? [{ label: "Admin", href: "/admin", icon: ShieldCheck }] : []),
+    { label: "Settings", href: "/settings", icon: Settings },
+  ];
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card lg:flex">
@@ -29,7 +38,7 @@ function AppSidebar({ name, email, onSupport }: AppSidebarProps) {
         <Logo />
       </div>
       <nav className="flex-1 space-y-1 px-3 py-2">
-        {NAV.map(({ label, href, icon: Icon }) => (
+        {nav.map(({ label, href, icon: Icon }) => (
           <Link
             key={href}
             href={href}

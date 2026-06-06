@@ -34,17 +34,25 @@ const SCHEMA_SQL = `
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS organisations (
-    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    name               text NOT NULL,
-    type               text NOT NULL DEFAULT 'personal' CHECK (type IN ('personal','business')),
-    owner_account_id   uuid,
-    subscription_level text,
-    renewal_date       date,
-    is_auto_renew      boolean,
-    payment_method     text,
-    created_at         timestamptz NOT NULL DEFAULT now(),
-    updated_at         timestamptz NOT NULL DEFAULT now()
+    id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                   text NOT NULL,
+    type                   text NOT NULL DEFAULT 'personal' CHECK (type IN ('personal','business')),
+    org_category           text NOT NULL DEFAULT 'personal',
+    is_accountant_practice boolean NOT NULL DEFAULT false,
+    status                 text NOT NULL DEFAULT 'active',
+    owner_account_id       uuid,
+    subscription_level     text,
+    renewal_date           date,
+    is_auto_renew          boolean,
+    payment_method         text,
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    updated_at             timestamptz NOT NULL DEFAULT now()
 );
+
+-- Guarded for pre-existing local DBs created before these columns landed.
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS org_category text NOT NULL DEFAULT 'personal';
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS is_accountant_practice boolean NOT NULL DEFAULT false;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
 
 CREATE TABLE IF NOT EXISTS users (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -122,6 +130,18 @@ CREATE TABLE IF NOT EXISTS user_invites (
     created_at         timestamptz NOT NULL DEFAULT now()
 );
 
+-- Phase 3: accountant practice ↔ client org grants (read + export access).
+CREATE TABLE IF NOT EXISTS accountant_org_links (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    accountant_org_id  uuid NOT NULL REFERENCES organisations(id),
+    client_org_id      uuid NOT NULL REFERENCES organisations(id),
+    created_by         uuid REFERENCES users(id),
+    status             text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','active','revoked')),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (accountant_org_id, client_org_id)
+);
+
 -- owner FK added after both tables exist; guarded so re-runs are safe.
 DO $$
 BEGIN
@@ -136,6 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_receipt_id ON expenses(receipt_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
+CREATE INDEX IF NOT EXISTS idx_accountant_org_links_accountant ON accountant_org_links(accountant_org_id);
+CREATE INDEX IF NOT EXISTS idx_accountant_org_links_client ON accountant_org_links(client_org_id);
 `;
 
 // A spread of demo transactions across the current calendar (tax) year.
@@ -157,6 +179,60 @@ const DEMO_TX = [
   { title: 'Design software', category: 'software', amount: 55, at: d(4, 21) },
 ];
 
+// Phase 3 / 3.1 accountant firm demo: a practice org with an ADMIN accountant
+// (owner) and a STAFF accountant (member). Each client is owned by the
+// accountant who "invited" it (accountant_org_links.created_by): the admin owns
+// Galway Equine, the staff accountant owns Murphy Retail. Logging in as the
+// admin shows both clients; as the staff accountant shows only Murphy Retail.
+const ACCT_ORG_ID = '00000000-0000-0000-0000-0000000000a2';
+const ACCT_USER_ID = '00000000-0000-0000-0000-0000000000b2';
+const ACCT_EMAIL = 'accountant@rian.dev';
+
+// Staff accountant — a member of the firm above.
+const ACCT2_USER_ID = '00000000-0000-0000-0000-0000000000b5';
+const ACCT2_EMAIL = 'accountant2@rian.dev';
+
+// Platform super admin — sees the whole platform via the Admin dashboard.
+const SUPER_ORG_ID = '00000000-0000-0000-0000-0000000000a9';
+const SUPER_USER_ID = '00000000-0000-0000-0000-0000000000b9';
+const SUPER_EMAIL = 'super@rian.dev';
+
+const DEMO_CLIENTS = [
+  {
+    orgId: '00000000-0000-0000-0000-0000000000a3',
+    userId: '00000000-0000-0000-0000-0000000000b3',
+    orgName: 'Galway Equine',
+    orgCategory: 'sole_trader_equine',
+    email: 'client1@rian.dev',
+    fname: 'Aoife',
+    sname: 'Byrne',
+    ownerUserId: ACCT_USER_ID, // owned by the admin accountant
+    tx: [
+      { title: 'Livery income', category: 'income', amount: 1200, at: d(0, 14) },
+      { title: 'Lessons income', category: 'income', amount: 640, at: d(1, 9) },
+      { title: 'Feed & bedding', category: 'equipment', amount: 540, at: d(0, 18) },
+      { title: 'Vet visit', category: 'professional', amount: 180, at: d(2, 9) },
+      { title: 'Diesel', category: 'travel', amount: 95.4, at: d(3, 11) },
+    ],
+  },
+  {
+    orgId: '00000000-0000-0000-0000-0000000000a4',
+    userId: '00000000-0000-0000-0000-0000000000b4',
+    orgName: 'Murphy Retail',
+    orgCategory: 'retail',
+    email: 'client2@rian.dev',
+    fname: 'Sean',
+    sname: 'Murphy',
+    ownerUserId: ACCT2_USER_ID, // owned by the staff accountant
+    tx: [
+      { title: 'Shop sales', category: 'income', amount: 4100, at: d(1, 15) },
+      { title: 'Stock purchase', category: 'equipment', amount: 2300, at: d(0, 7) },
+      { title: 'POS software', category: 'software', amount: 39, at: d(2, 1) },
+      { title: 'Electricity', category: 'utilities', amount: 120.5, at: d(3, 20) },
+    ],
+  },
+];
+
 async function main() {
   const pool = new Pool({ connectionString: DB_URL });
   const client = await pool.connect();
@@ -167,53 +243,114 @@ async function main() {
 
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
+    // Helpers (capture `client`/`passwordHash` from scope). Queries run
+    // sequentially — a single pg client can't execute concurrent queries.
+    const insertTx = async (userId, txns) => {
+      for (const tx of txns) {
+        await client.query(
+          `INSERT INTO expenses (user_id, title, description, category, amount, currency, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,'EUR',$6,$6)`,
+          [userId, tx.title, '', tx.category, tx.amount, tx.at],
+        );
+      }
+    };
+
+    const insertOrgWithOwner = async (o) => {
+      await client.query(
+        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice)],
+      );
+      await client.query(
+        `INSERT INTO users (
+            id, fname, sname, email, currency, password_hash, role,
+            org_id, org_role, platform_role
+         ) VALUES ($1,$2,$3,$4,'EUR',$5,$6,$7,'owner',$8)`,
+        [o.userId, o.fname, o.sname, o.email, passwordHash, o.role, o.orgId, o.platformRole || 'user'],
+      );
+      await client.query('UPDATE organisations SET owner_account_id = $1 WHERE id = $2', [o.userId, o.orgId]);
+    };
+
+    // Every demo id this script owns (original personal demo + accountant flow).
+    const allOrgIds = [DEMO_ORG_ID, ACCT_ORG_ID, SUPER_ORG_ID, ...DEMO_CLIENTS.map((c) => c.orgId)];
+    const allUserIds = [DEMO_USER_ID, ACCT_USER_ID, ACCT2_USER_ID, SUPER_USER_ID, ...DEMO_CLIENTS.map((c) => c.userId)];
+    const allEmails = [DEMO_EMAIL, ACCT_EMAIL, ACCT2_EMAIL, SUPER_EMAIL, ...DEMO_CLIENTS.map((c) => c.email)];
+
     await client.query('BEGIN');
 
     // Reset demo rows (order respects FKs).
-    await client.query('DELETE FROM expenses WHERE user_id = $1', [DEMO_USER_ID]);
     await client.query(
-      'UPDATE organisations SET owner_account_id = NULL WHERE id = $1',
-      [DEMO_ORG_ID],
+      'DELETE FROM accountant_org_links WHERE accountant_org_id = ANY($1) OR client_org_id = ANY($1)',
+      [allOrgIds],
     );
-    await client.query('DELETE FROM users WHERE id = $1 OR email = $2', [
-      DEMO_USER_ID,
-      DEMO_EMAIL,
-    ]);
-    await client.query('DELETE FROM organisations WHERE id = $1', [DEMO_ORG_ID]);
+    await client.query('DELETE FROM expenses WHERE user_id = ANY($1)', [allUserIds]);
+    await client.query('UPDATE organisations SET owner_account_id = NULL WHERE id = ANY($1)', [allOrgIds]);
+    await client.query('DELETE FROM users WHERE id = ANY($1) OR email = ANY($2)', [allUserIds, allEmails]);
+    await client.query('DELETE FROM organisations WHERE id = ANY($1)', [allOrgIds]);
 
-    await client.query(
-      `INSERT INTO organisations (id, name, type) VALUES ($1, 'Demo Org', 'personal')`,
-      [DEMO_ORG_ID],
-    );
+    // Original personal demo account.
+    await insertOrgWithOwner({
+      orgId: DEMO_ORG_ID, userId: DEMO_USER_ID, orgName: 'Demo Org', orgType: 'personal',
+      orgCategory: 'personal', email: DEMO_EMAIL, fname: 'Demo', sname: 'User', role: 'user', isPractice: false,
+    });
+    await insertTx(DEMO_USER_ID, DEMO_TX);
 
+    // Platform super admin.
+    await insertOrgWithOwner({
+      orgId: SUPER_ORG_ID, userId: SUPER_USER_ID, orgName: 'Platform Admin', orgType: 'business',
+      orgCategory: 'consultant', email: SUPER_EMAIL, fname: 'Platform', sname: 'Admin',
+      role: 'admin', isPractice: false, platformRole: 'super_admin',
+    });
+
+    // Accountant practice (flagged) + its admin (owner) accountant.
+    await insertOrgWithOwner({
+      orgId: ACCT_ORG_ID, userId: ACCT_USER_ID, orgName: 'Rian Accountancy', orgType: 'business',
+      orgCategory: 'consultant', email: ACCT_EMAIL, fname: 'Áine', sname: 'Kelly', role: 'accountant', isPractice: true,
+    });
+
+    // Staff accountant — a MEMBER of the firm (org_role 'member').
     await client.query(
       `INSERT INTO users (
           id, fname, sname, email, currency, password_hash, role,
           org_id, org_role, platform_role
-       ) VALUES ($1,'Demo','User',$2,'EUR',$3,'user',$4,'owner','user')`,
-      [DEMO_USER_ID, DEMO_EMAIL, passwordHash, DEMO_ORG_ID],
+       ) VALUES ($1,'Cathal','Walsh',$2,'EUR',$3,'accountant',$4,'member','user')`,
+      [ACCT2_USER_ID, ACCT2_EMAIL, passwordHash, ACCT_ORG_ID],
     );
 
-    await client.query(
-      'UPDATE organisations SET owner_account_id = $1 WHERE id = $2',
-      [DEMO_USER_ID, DEMO_ORG_ID],
-    );
-
-    for (const tx of DEMO_TX) {
+    // Client orgs, each linked active and OWNED by a specific accountant
+    // (created_by) so the admin-sees-all vs member-sees-own split is testable.
+    for (const c of DEMO_CLIENTS) {
+      await insertOrgWithOwner({
+        orgId: c.orgId, userId: c.userId, orgName: c.orgName, orgType: 'business',
+        orgCategory: c.orgCategory, email: c.email, fname: c.fname, sname: c.sname, role: 'user', isPractice: false,
+      });
+      await insertTx(c.userId, c.tx);
       await client.query(
-        `INSERT INTO expenses (user_id, title, description, category, amount, currency, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,'EUR',$6,$6)`,
-        [DEMO_USER_ID, tx.title, '', tx.category, tx.amount, tx.at],
+        `INSERT INTO accountant_org_links (accountant_org_id, client_org_id, created_by, status)
+         VALUES ($1,$2,$3,'active')`,
+        [ACCT_ORG_ID, c.orgId, c.ownerUserId],
       );
     }
 
     await client.query('COMMIT');
 
     console.log('\n✅ Seeded demo data');
-    console.log(`   ${DEMO_TX.length} transactions for ${DEMO_EMAIL}`);
-    console.log('\n   Log in with:');
-    console.log(`     email:    ${DEMO_EMAIL}`);
-    console.log(`     password: ${DEMO_PASSWORD}\n`);
+    console.log(`   Personal demo: ${DEMO_TX.length} transactions for ${DEMO_EMAIL}`);
+    console.log('   Accountancy firm "Rian Accountancy" — admin + staff accountant:');
+    DEMO_CLIENTS.forEach((c) =>
+      console.log(
+        `     • ${c.orgName} (${c.tx.length} txns) → owned by ${c.ownerUserId === ACCT_USER_ID ? 'admin' : 'staff'}`,
+      ),
+    );
+    console.log(`\n   All accounts share the password: ${DEMO_PASSWORD}`);
+    console.log('\n   Super admin (whole-platform Admin dashboard):');
+    console.log(`     email:    ${SUPER_EMAIL}`);
+    console.log('   Admin accountant (sees BOTH clients, manages the team, can reassign):');
+    console.log(`     email:    ${ACCT_EMAIL}`);
+    console.log('   Staff accountant (sees ONLY Murphy Retail):');
+    console.log(`     email:    ${ACCT2_EMAIL}`);
+    console.log('   Personal demo user:');
+    console.log(`     email:    ${DEMO_EMAIL}\n`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Seed failed:', err.message);

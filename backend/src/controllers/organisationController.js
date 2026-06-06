@@ -1,7 +1,14 @@
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 const organisationModel = require('../models/organisationModel');
+const userModel = require('../models/userModel');
 const { getTemplateFor } = require('../config/categoryTemplates');
 const { isSuperAdmin } = require('../middlewares/tenantScope');
+const { sendInviteEmail } = require('./userController');
 const logger = require('../utils/logger');
+
+const jwtSecret = process.env.JWT_SECRET;
+const frontendURL = process.env.FRONTEND_URL;
 
 // Org-scoping: a caller may only touch their own org (the one in their token),
 // unless they are a platform super_admin. Returns true when access is allowed;
@@ -89,8 +96,52 @@ const updateOrganisation = async (req, res) => {
     }
 };
 
+// GET /organisations/:id/members — owner-only (enforced on the route) + scoped.
+// Lists everyone in the org (members' submissions roll up to the org).
+const getMembers = async (req, res) => {
+    if (!allowOrgAccess(req, res)) return;
+    try {
+        const members = await userModel.getUsersByOrgId(req.pool, req.params.id);
+        return res.status(200).json(members);
+    } catch (error) {
+        logger.error('Error fetching organisation members: %s', error.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+// POST /organisations/:id/invite-member — owner-only (enforced on the route).
+// Sends a MEMBER invite: the invitee joins this org (inviter_id token, handled
+// by register's mode='invite'). Distinct from the accountant client invite.
+const inviteMember = async (req, res) => {
+    if (!allowOrgAccess(req, res)) return;
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required.' });
+    }
+    try {
+        const existingUser = await userModel.getUserByEmail(req.pool, email);
+        if (existingUser) {
+            return res.status(400).json({ error: 'User with this email already exists.' });
+        }
+        const inviteToken = jwt.sign(
+            { email, inviter_id: req.user.userId },
+            jwtSecret,
+            { expiresIn: '168h' }
+        );
+        const inviteLink = `${frontendURL}/signup?token=${inviteToken}`;
+        await sendInviteEmail(email, inviteLink);
+        logger.info('Member invite sent to %s for org %s', email, req.params.id);
+        return res.status(200).json({ message: 'Invitation email sent successfully.' });
+    } catch (error) {
+        logger.error('Error inviting member: %s', error.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     getOrganisation,
     getCategories,
     updateOrganisation,
+    getMembers,
+    inviteMember,
 };

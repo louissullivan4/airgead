@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const accountantLinkModel = require('../models/accountantLinkModel');
 
 // Attaches the caller's organisation id to the request for downstream handlers.
 // authenticateToken already guarantees req.user.orgId exists (else 401), but we
@@ -34,9 +35,27 @@ const requireOrgRole = (role) => (req, res, next) => {
     next();
 };
 
+// Phase 3: gate actions that only an accountancy practice may perform (sending
+// client invites). super_admin bypasses. Requires req.pool + req.user.orgId.
+const requireAccountantPractice = async (req, res, next) => {
+    if (isSuperAdmin(req)) return next();
+    try {
+        const ok = await accountantLinkModel.isAccountantPractice(req.pool, req.user.orgId);
+        if (!ok) {
+            logger.warn('Non-practice org attempted an accountant action: %s', req.user && req.user.orgId);
+            return res.status(403).json({ error: 'Access denied. This action requires an accountancy practice account.' });
+        }
+        next();
+    } catch (error) {
+        logger.error('Error in requireAccountantPractice: %s', error.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     scopeToOrg,
     requirePlatformRole,
     requireOrgRole,
+    requireAccountantPractice,
     isSuperAdmin,
 };

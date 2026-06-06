@@ -43,6 +43,9 @@ const local = {
     async exists(objectPath) {
         return fs.pathExists(localPathFor(objectPath));
     },
+    async deleteObject(objectPath) {
+        await fs.remove(localPathFor(objectPath));
+    },
     createReadStream(objectPath) {
         return fs.createReadStream(localPathFor(objectPath));
     },
@@ -67,6 +70,9 @@ const gcs = {
         const [ok] = await require('./gcs').getBucket().file(objectPath).exists();
         return ok;
     },
+    async deleteObject(objectPath) {
+        await require('./gcs').getBucket().file(objectPath).delete({ ignoreNotFound: true });
+    },
     createReadStream(objectPath) {
         return require('./gcs').getBucket().file(objectPath).createReadStream();
     },
@@ -89,6 +95,7 @@ logger.info(DRIVER === 'gcs'
 module.exports = {
     putObject: driver.putObject,
     exists: driver.exists,
+    deleteObject: driver.deleteObject,
     createReadStream: driver.createReadStream,
     getSignedUrl: driver.getSignedUrl,
     DRIVER,

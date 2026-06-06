@@ -57,8 +57,27 @@ Phase 5 — Export & integrations
 [NEW] Sage export adapter + pluggable export-adapter interface (Xero/QuickBooks next).
 [REWORK] Receipt-by-ID fetch + bulk zip — wire into the Transactions toolbar Export button.
 
-Phase 6 — Accountant admin overview
+Phase 6 — Accountant admin overview  [DONE — see docs/phase-3-accountant-dashboard.md]
 
-[KEEP] getUsersByInviterId, /accountant/users route, invite flow.
-[NEW] Admin page listing an accountant's client orgs; selecting one re-scopes app (read + export) to that org.
-[REWORK] Tenant-scoping middleware (from Phase 0) — allow an accountant org to access client orgs it manages.
+Shipped as the "Phase 3 accountant workspace". The three relationship types, the
+accountant_org_links table, and the accessible-set scoping rule are documented in
+docs/phase-3-accountant-dashboard.md.
+
+[DONE] accountant_org_links (migration 007) + organisations.is_accountant_practice (manual/DB-only flag, paid later).
+[DONE] Client invite (kind='client'): invitee creates their OWN isolated org + an active link back to the practice; accountant never joins it.
+[DONE] Dedicated /accountant/* endpoints (list clients + stats, client transactions, export zip/csv, revoke) — every request verifies an active link (assertClientAccess) before returning data; revoked/missing link = 403.
+[DONE] Clients workspace + read-only client detail (reuses TransactionsTable), Team tab (org-admin member management), landing "For accountants" link.
+[KEEP] getUsersByInviterId, /accountant/users (legacy member grouping) — superseded for the Team view by getUsersByOrgId.
+
+Phase 3.1 — Accountancy firms (multiple accountants) [DONE]
+[DONE] Self-serve firm signup (is_accountant_practice flag at signup) → signer is admin/owner.
+[DONE] Per-accountant client ownership via accountant_org_links.created_by: admin (owner)/super_admin see all firm clients, member accountants see only their own (assertClientAccess, getClientsWithStats, getAccessibleOrgIds).
+[DONE] Admin invites accountants (existing owner-only invite-member) + admin reassigns clients (PATCH /accountant/clients/:id/assign).
+[DONE] Frontend: signup firm checkbox, Clients admin "Accountant" column + Reassign, Team tab firm copy. Seed adds a staff accountant + split ownership.
+
+Phase 4 — Super-admin platform dashboard [DONE — see docs/phase-4-super-admin.md]
+[DONE] /admin/* surface (requirePlatformRole) — platform overview (all orgs/users/firms + totals), all-orgs + all-users listings.
+[DONE] Type-selectable invite (regular user vs accountant→firm) via platform invite token.
+[DONE] Suspend/reactivate users + orgs (migration 008 organisations.status; users.account_status), enforced at login.
+[DONE] GDPR hard-delete cascades (org + user) incl. stored receipt images (storage.deleteObject); self-target + owner-with-members guards.
+[DONE] Frontend Admin dashboard + nav gating; drill into any org via the read-only client-detail view. Seed adds super@rian.dev.

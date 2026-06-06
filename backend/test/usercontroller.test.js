@@ -9,6 +9,7 @@ const { expect } = require('@jest/globals');
 
 const userController = require('../src/controllers/userController');
 const userModel = require('../src/models/userModel');
+const organisationModel = require('../src/models/organisationModel');
 
 describe('User Controller Functions', () => {
   let req, res;
@@ -81,9 +82,10 @@ describe('User Controller Functions', () => {
       req.body = { email: 'john@example.com', password: 'password123' };
       sinon.stub(userModel, 'getUserPasswordByEmail').resolves({
         id: 1, email: 'john@example.com', role: 'user', password_hash: 'hash',
-        org_id: 'org-1', org_role: 'owner', platform_role: 'user',
+        org_id: 'org-1', org_role: 'owner', platform_role: 'user', account_status: 'active',
       });
       sinon.stub(bcrypt, 'compare').resolves(true);
+      sinon.stub(organisationModel, 'getOrgById').resolves({ id: 'org-1', status: 'active' });
       const signStub = sinon.stub(jwt, 'sign').returns('testtoken');
       await userController.login(req, res);
       expect(res.status.calledWith(200)).toBe(true);
@@ -135,8 +137,8 @@ describe('User Controller Functions', () => {
       req.body = { email: 'newuser@example.com' };
       sinon.stub(userModel, 'getUserByEmail').resolves(null);
       sinon.stub(jwt, 'sign').returns('inviteToken');
-      // inviteUser uses the callback form: sendMail(opts, cb)
-      const sendMail = sinon.stub().callsArgWith(1, null, { response: 'ok' });
+      // inviteUser now awaits the shared sendInviteEmail helper (promise form).
+      const sendMail = sinon.stub().resolves({ response: 'ok' });
       sinon.stub(nodemailer, 'createTransport').returns({ sendMail });
       await userController.inviteUser(req, res);
       expect(res.status.calledWith(200)).toBe(true);

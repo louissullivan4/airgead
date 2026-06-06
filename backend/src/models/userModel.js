@@ -332,6 +332,37 @@ const getUsersByInviterId = async (pool, inviterId) => {
     }
 };
 
+// Phase 3 org membership listing. Members of an org share org_id; this is the
+// correct rollup for the Team view (inviter_id groupings are legacy). Returns
+// org_id/org_role so the UI can show who owns vs. is a member of the org.
+const getUsersByOrgId = async (pool, orgId) => {
+    try {
+        const result = await pool.query(
+            `SELECT
+              account_status,
+              created_at,
+              email,
+              fname,
+              id,
+              last_login,
+              org_id,
+              org_role,
+              role,
+              sname,
+              updated_at
+            FROM users
+            WHERE org_id = $1
+            ORDER BY org_role ASC, created_at ASC`,
+            [orgId]
+        );
+        logger.info('Fetched users for org', { orgId });
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching users by org_id', { orgId, error: error.message });
+        throw error;
+    }
+};
+
 // Phase 0 tenant scoping helper: does the given user belong to the given org?
 // Used by controllers to reject cross-org access (403) on by-id endpoints.
 const isUserInOrg = async (pool, userId, orgId) => {
@@ -421,6 +452,7 @@ module.exports = {
     deleteUserByEmail,
     saveInviteToken,
     getUsersByInviterId,
+    getUsersByOrgId,
     getUserPasswordByEmail,
     updateUserById,
     isUserInOrg

@@ -63,7 +63,8 @@ function extractExpenseData(req, res) {
         category,
         amount,
         currency,
-        image
+        image,
+        date
     } = req.body;
 
     if (!user_id || !title || !category || !amount || !currency) {
@@ -79,6 +80,9 @@ function extractExpenseData(req, res) {
         amount,
         currency,
         image,
+        // The transaction date chosen in the form maps to created_at. Omitted ->
+        // the model defaults to now() (create) or keeps the existing value (edit).
+        created_at: date || undefined,
         receipt_image_url: null
     }
 }

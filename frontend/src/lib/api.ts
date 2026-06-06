@@ -153,6 +153,71 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    /** Owner-only: everyone in the org (owner + members). */
+    members: (id: string) => request<OrgMember[]>(`/organisations/${id}/members`),
+    /** Owner-only: invite someone to JOIN this org as a member. */
+    inviteMember: (id: string, email: string) =>
+      request<void>(`/organisations/${id}/invite-member`, {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+  },
+  // Accountant practice → client workspace. Every read verifies an active link
+  // server-side; an unlinked/revoked client returns 403.
+  accountant: {
+    /** Linked client orgs with this-tax-year summary stats. */
+    listClients: () => request<ClientSummary[]>("/accountant/clients"),
+    /** A client org's transactions (optionally narrowed to a tax year). */
+    getClientTransactions: (clientOrgId: string, year?: string | number) =>
+      request<Expense[]>(
+        `/accountant/clients/${clientOrgId}/transactions${year ? `?year=${year}` : ""}`,
+      ),
+    /** Authenticated export of a client org (zip = Excel + images, or csv). */
+    exportClient: (clientOrgId: string, year: string | number, format: "zip" | "csv" = "zip") =>
+      requestBlob(`/accountant/clients/${clientOrgId}/export?format=${format}&year=${year}`),
+    /** Revoke the practice's access to a client org. */
+    revokeClient: (clientOrgId: string) =>
+      request<void>(`/accountant/clients/${clientOrgId}/link`, { method: "DELETE" }),
+    /** Firm admin: reassign a client to another accountant in the firm. */
+    assignClient: (clientOrgId: string, accountantUserId: string) =>
+      request<void>(`/accountant/clients/${clientOrgId}/assign`, {
+        method: "PATCH",
+        body: JSON.stringify({ accountantUserId }),
+      }),
+    /** Practice-only: invite someone who will create their OWN org, linked back. */
+    inviteClient: (orgId: string, email: string) =>
+      request<void>(`/organisations/${orgId}/invite-client`, {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+  },
+  // Platform super-admin surface. Every route is super_admin-gated server-side.
+  admin: {
+    overview: () => request<PlatformStats>("/admin/overview"),
+    orgs: () => request<AdminOrg[]>("/admin/orgs"),
+    users: () => request<AdminUser[]>("/admin/users"),
+    /** Invite a new account; kind 'accountant' provisions a firm on signup. */
+    invite: (email: string, kind: "user" | "accountant") =>
+      request<void>("/admin/invite", { method: "POST", body: JSON.stringify({ email, kind }) }),
+    setUserPlatformRole: (id: string, platformRole: "user" | "super_admin") =>
+      request<void>(`/admin/users/${id}/platform-role`, {
+        method: "PATCH",
+        body: JSON.stringify({ platformRole }),
+      }),
+    setUserStatus: (id: string, status: "active" | "suspended") =>
+      request<void>(`/admin/users/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    /** GDPR hard-delete of a user (cascades their org if they solely own it). */
+    deleteUser: (id: string) => request<void>(`/admin/users/${id}`, { method: "DELETE" }),
+    setOrgStatus: (id: string, status: "active" | "suspended") =>
+      request<void>(`/admin/orgs/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    /** GDPR hard-delete of an entire org and all its data. */
+    deleteOrg: (id: string) => request<void>(`/admin/orgs/${id}`, { method: "DELETE" }),
   },
 };
 
@@ -262,6 +327,8 @@ export interface CreateExpenseData {
   amount: number;
   currency: string;
   image?: string; // base64 data URL; backend uploads it and stores the object path
+  /** Transaction date as YYYY-MM-DD; maps to created_at on the backend. */
+  date?: string;
 }
 
 export type UpdateExpenseData = Partial<CreateExpenseData>;
@@ -315,8 +382,85 @@ export interface Organisation {
   categories?: CategoryTree | null;
   owner_account_id?: string | null;
   subscription_level?: string | null;
+  /** True for accountancy practice orgs (unlocks the Clients workspace). */
+  is_accountant_practice?: boolean;
+  /** Lifecycle status; a suspended org's users cannot log in. */
+  status?: "active" | "suspended";
   created_at?: string;
   updated_at?: string;
+}
+
+/** Platform-wide counts + this-tax-year totals (GET /admin/overview). */
+export interface PlatformStats {
+  orgs: string | number;
+  users: string | number;
+  firms: string | number;
+  clients: string | number;
+  txns: string | number;
+  expense_total: string | number;
+  income_total: string | number;
+}
+
+/** An organisation row in the super-admin overview. */
+export interface AdminOrg {
+  id: string;
+  name: string;
+  type: "personal" | "business";
+  org_category: string;
+  is_accountant_practice: boolean;
+  status: "active" | "suspended";
+  member_count: string | number;
+  txn_count: string | number;
+  expense_total: string | number;
+  income_total: string | number;
+  last_activity: string | null;
+  created_at: string;
+}
+
+/** A user row in the super-admin overview. */
+export interface AdminUser {
+  id: string;
+  fname: string;
+  sname: string;
+  email: string;
+  role: "user" | "admin" | "accountant";
+  org_role: "owner" | "member";
+  platform_role: "user" | "super_admin";
+  account_status: string;
+  org_id: string | null;
+  org_name: string | null;
+  is_accountant_practice: boolean | null;
+  created_at: string;
+  last_login: string | null;
+}
+
+/** A member of an org, as listed in the Team view. */
+export interface OrgMember {
+  id: string;
+  fname: string;
+  sname: string;
+  email: string;
+  org_role: "owner" | "member";
+  role: "user" | "admin" | "accountant";
+  account_status?: string;
+  created_at?: string;
+  last_login?: string;
+}
+
+/** A linked client org with this-tax-year rollups (GET /accountant/clients). */
+export interface ClientSummary {
+  id: string;
+  name: string;
+  type: "personal" | "business";
+  org_category: string;
+  /** Postgres count/NUMERIC arrive as strings. */
+  txn_count: string | number;
+  expense_total: string | number;
+  income_total: string | number;
+  last_activity: string | null;
+  /** Owning accountant (created_by) — shown to the firm admin. */
+  created_by: string | null;
+  owner_name: string | null;
 }
 
 /** A node in the org category tree. A leaf (no children) is what gets stored on a transaction. */

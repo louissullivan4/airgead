@@ -3,19 +3,27 @@ const { ORG_CATEGORY_SLUGS, getTemplateFor } = require('../config/categoryTempla
 
 // Columns an owner may edit via PATCH /organisations/:id. `categories` is
 // handled specially (jsonb).
-const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 'type', 'org_category', 'categories'];
+const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 'type', 'org_category', 'categories', 'status'];
 
 // Phase 1 signup provisioning. A new account must belong to an organisation or
 // its JWT will lack orgId and be rejected by authMiddleware (the Phase 0 gap).
 //
 // Two modes, both run in a single transaction:
-//   - 'self'   : create a new personal org; the new user becomes its owner.
+//   - 'self'   : create a new org; the new user becomes its owner.
 //   - 'invite' : join the inviter's existing org as a member.
+//
+// Phase 3: a CLIENT invite is a 'self' signup (the client gets their own,
+// isolated org) PLUS `accountantOrgId` set — in which case we also write an
+// *active* accountant_org_links row in the same transaction so the inviting
+// practice gains read access. The accountant never joins the client org.
+// `createdBy` is the inviting accountant's user id (from the signed invite
+// token). These are optional fields on the options object, so existing callers
+// are unaffected (no positional param change).
 //
 // `user` carries the already-validated profile fields (password is the bcrypt
 // hash). Returns the created users row (RETURNING *), including org_id/org_role/
 // platform_role so a token can be issued from it.
-const createUserWithOrg = async (pool, { user, mode, inviterId }) => {
+const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId, createdBy }) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -46,9 +54,15 @@ const createUserWithOrg = async (pool, { user, mode, inviterId }) => {
             if (!ORG_CATEGORY_SLUGS.includes(orgCategory)) {
                 orgCategory = 'personal';
             }
-            // A non-personal category implies a business; else honour an
-            // explicit business type, else personal.
-            const orgType = orgCategory !== 'personal'
+            // Self-serve accountancy firm signup: flags the org so it unlocks the
+            // Clients workspace and may invite clients. A firm is always a
+            // business. (Phase 3 kept this flag DB-only; Phase 3.1 lets a firm
+            // self-provision at signup — the signer becomes the admin/owner.)
+            const isPractice = Boolean(provided && provided.is_accountant_practice === true);
+
+            // A non-personal category (or a firm) implies a business; else
+            // honour an explicit business type, else personal.
+            const orgType = (orgCategory !== 'personal' || isPractice)
                 ? 'business'
                 : (provided && provided.type === 'business' ? 'business' : 'personal');
 
@@ -58,8 +72,8 @@ const createUserWithOrg = async (pool, { user, mode, inviterId }) => {
 
             const org = await client.query(
                 `INSERT INTO organisations
-                    (name, type, description, country, vat_number, org_category, categories)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                    (name, type, description, country, vat_number, org_category, categories, is_accountant_practice)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
                  RETURNING id`,
                 [
                     orgName,
@@ -69,6 +83,7 @@ const createUserWithOrg = async (pool, { user, mode, inviterId }) => {
                     (provided && provided.vat_number) || null,
                     orgCategory,
                     JSON.stringify(categories),
+                    isPractice,
                 ]
             );
             orgId = org.rows[0].id;
@@ -118,6 +133,18 @@ const createUserWithOrg = async (pool, { user, mode, inviterId }) => {
                 'UPDATE organisations SET owner_account_id = $1 WHERE id = $2',
                 [newUser.id, orgId]
             );
+        }
+
+        // Client invite: grant the inviting practice active read access over the
+        // brand-new client org. Only valid on a 'self' signup (the client owns a
+        // separate org); never when joining as a member.
+        if (mode !== 'invite' && accountantOrgId) {
+            await client.query(
+                `INSERT INTO accountant_org_links (accountant_org_id, client_org_id, created_by, status)
+                 VALUES ($1, $2, $3, 'active')`,
+                [accountantOrgId, orgId, createdBy || null]
+            );
+            logger.info('Linked client org to accountant practice', { accountantOrgId, clientOrgId: orgId });
         }
 
         await client.query('COMMIT');

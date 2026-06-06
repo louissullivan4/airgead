@@ -119,6 +119,13 @@ interface LineDraft {
   description: string;
 }
 
+/** Local YYYY-MM-DD for a date input (avoids the UTC shift of toISOString). */
+function toDateInput(value?: string): string {
+  const d = value ? new Date(value) : new Date();
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 10);
+}
+
 function TransactionFormDialog({
   open,
   onOpenChange,
@@ -142,6 +149,7 @@ function TransactionFormDialog({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(defaultCurrency);
   const [description, setDescription] = useState("");
+  const [date, setDate] = useState(() => toDateInput());
   const [image, setImage] = useState<string | undefined>(undefined);
 
   // --- receipt multi-line state ---
@@ -160,12 +168,14 @@ function TransactionFormDialog({
       setAmount(String(amountOf(expense)));
       setCurrency(expense.currency || defaultCurrency);
       setDescription(expense.description ?? "");
+      setDate(toDateInput(expense.created_at));
     } else {
       setType("expense");
       setTitle("");
       setAmount("");
       setCurrency(defaultCurrency);
       setDescription("");
+      setDate(toDateInput());
     }
     setImage(undefined);
   }, [open, expense, defaultCurrency]);
@@ -268,6 +278,7 @@ function TransactionFormDialog({
       amount: numeric,
       currency,
       image,
+      date: date || undefined,
     };
     setSaving(true);
     try {
@@ -462,6 +473,15 @@ function TransactionFormDialog({
                 </Select>
               </Field>
             </div>
+
+            <Field label="Date" htmlFor="tx-date" required>
+              <Input
+                id="tx-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </Field>
 
             <Field label="Description" htmlFor="tx-desc" hint="Optional">
               <Textarea
