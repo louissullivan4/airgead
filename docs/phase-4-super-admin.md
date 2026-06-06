@@ -77,5 +77,5 @@ owner-with-members → 409; own org → 400) with image cleanup; login rejects a
 suspended user and a suspended org.
 
 ## Seed
-`super@rian.dev` (`platform_role='super_admin'`, password `Password123!`) — log in
-to reach the Admin dashboard.
+`demo@rian.dev` is the platform super admin for now (`platform_role='super_admin'`,
+password `Password123!`) — log in to reach the Admin dashboard.

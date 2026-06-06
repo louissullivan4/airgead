@@ -192,11 +192,6 @@ const ACCT_EMAIL = 'accountant@rian.dev';
 const ACCT2_USER_ID = '00000000-0000-0000-0000-0000000000b5';
 const ACCT2_EMAIL = 'accountant2@rian.dev';
 
-// Platform super admin — sees the whole platform via the Admin dashboard.
-const SUPER_ORG_ID = '00000000-0000-0000-0000-0000000000a9';
-const SUPER_USER_ID = '00000000-0000-0000-0000-0000000000b9';
-const SUPER_EMAIL = 'super@rian.dev';
-
 const DEMO_CLIENTS = [
   {
     orgId: '00000000-0000-0000-0000-0000000000a3',
@@ -272,9 +267,9 @@ async function main() {
     };
 
     // Every demo id this script owns (original personal demo + accountant flow).
-    const allOrgIds = [DEMO_ORG_ID, ACCT_ORG_ID, SUPER_ORG_ID, ...DEMO_CLIENTS.map((c) => c.orgId)];
-    const allUserIds = [DEMO_USER_ID, ACCT_USER_ID, ACCT2_USER_ID, SUPER_USER_ID, ...DEMO_CLIENTS.map((c) => c.userId)];
-    const allEmails = [DEMO_EMAIL, ACCT_EMAIL, ACCT2_EMAIL, SUPER_EMAIL, ...DEMO_CLIENTS.map((c) => c.email)];
+    const allOrgIds = [DEMO_ORG_ID, ACCT_ORG_ID, ...DEMO_CLIENTS.map((c) => c.orgId)];
+    const allUserIds = [DEMO_USER_ID, ACCT_USER_ID, ACCT2_USER_ID, ...DEMO_CLIENTS.map((c) => c.userId)];
+    const allEmails = [DEMO_EMAIL, ACCT_EMAIL, ACCT2_EMAIL, ...DEMO_CLIENTS.map((c) => c.email)];
 
     await client.query('BEGIN');
 
@@ -288,19 +283,13 @@ async function main() {
     await client.query('DELETE FROM users WHERE id = ANY($1) OR email = ANY($2)', [allUserIds, allEmails]);
     await client.query('DELETE FROM organisations WHERE id = ANY($1)', [allOrgIds]);
 
-    // Original personal demo account.
+    // Original personal demo account — doubles as the platform super admin for now.
     await insertOrgWithOwner({
       orgId: DEMO_ORG_ID, userId: DEMO_USER_ID, orgName: 'Demo Org', orgType: 'personal',
-      orgCategory: 'personal', email: DEMO_EMAIL, fname: 'Demo', sname: 'User', role: 'user', isPractice: false,
+      orgCategory: 'personal', email: DEMO_EMAIL, fname: 'Demo', sname: 'User',
+      role: 'user', isPractice: false, platformRole: 'super_admin',
     });
     await insertTx(DEMO_USER_ID, DEMO_TX);
-
-    // Platform super admin.
-    await insertOrgWithOwner({
-      orgId: SUPER_ORG_ID, userId: SUPER_USER_ID, orgName: 'Platform Admin', orgType: 'business',
-      orgCategory: 'consultant', email: SUPER_EMAIL, fname: 'Platform', sname: 'Admin',
-      role: 'admin', isPractice: false, platformRole: 'super_admin',
-    });
 
     // Accountant practice (flagged) + its admin (owner) accountant.
     await insertOrgWithOwner({
@@ -343,14 +332,12 @@ async function main() {
       ),
     );
     console.log(`\n   All accounts share the password: ${DEMO_PASSWORD}`);
-    console.log('\n   Super admin (whole-platform Admin dashboard):');
-    console.log(`     email:    ${SUPER_EMAIL}`);
+    console.log('\n   Super admin (whole-platform Admin dashboard) — also the personal demo user:');
+    console.log(`     email:    ${DEMO_EMAIL}`);
     console.log('   Admin accountant (sees BOTH clients, manages the team, can reassign):');
     console.log(`     email:    ${ACCT_EMAIL}`);
     console.log('   Staff accountant (sees ONLY Murphy Retail):');
-    console.log(`     email:    ${ACCT2_EMAIL}`);
-    console.log('   Personal demo user:');
-    console.log(`     email:    ${DEMO_EMAIL}\n`);
+    console.log(`     email:    ${ACCT2_EMAIL}\n`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('Seed failed:', err.message);
