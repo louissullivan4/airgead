@@ -3,9 +3,6 @@ node_modules/
 .pnp
 .pnp.js
 
-# Lockfiles (keep package-lock.json out of git for monorepo, adjust if preferred)
-package-lock.json
-
 # Environment files
 .env
 .env.local
