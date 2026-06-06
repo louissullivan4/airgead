@@ -21,6 +21,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: dev
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -51,6 +52,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     restart: unless-stopped
     ports:
       - "3000:3000"
