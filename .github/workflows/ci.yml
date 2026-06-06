@@ -161,7 +161,7 @@ jobs:
           key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - if: steps.root-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run migrate --workspace=backend
+      - run: npm run migrate:up --workspace=backend
         env:
           DB_URL: ${{ secrets.DB_URL }}
 
