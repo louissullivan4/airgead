@@ -23,7 +23,7 @@ const serveFile = async (req, res) => {
         let payload;
         try {
             payload = jwt.verify(req.params.token, process.env.JWT_SECRET);
-        } catch (err) {
+        } catch {
             return res.status(403).json({ error: 'Invalid or expired link.' });
         }
 

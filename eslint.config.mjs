@@ -22,4 +22,19 @@ export default [
     },
   },
   pluginJs.configs.recommended,
+  {
+    // Allow intentionally-unused names prefixed with `_` (e.g. the `next` arg
+    // an Express error handler must declare to be recognised as one). Placed
+    // after the recommended config so it isn't overridden by it.
+    rules: {
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ];

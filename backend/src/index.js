@@ -42,7 +42,7 @@ app.use('/accountant', accountantRoutes);
 app.use('/admin', adminRoutes);
 app.use('/files', fileRoutes);
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
     logger.error('Unhandled error: ', err);
     res.status(500).json({ error: 'Internal server error.' });
 });
