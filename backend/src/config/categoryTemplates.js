@@ -4,8 +4,15 @@
 // fall back to the matching template at read time (see organisationController).
 //
 // Tree shape (recursive, max 2 levels used today):
-//   Node = { slug, label, children?: Node[] }
+//   Node = { slug, label, children?: Node[], capital?: true, vat58?: true }
 //   Template = { expense: Node[], income: Node[] }
+//
+// Phase 5 metadata flags (suggestions for the UI, never enforced server-side):
+//   capital — picking this category suggests "capital item" (asset register /
+//             wear & tear over 8 years) in the transaction form.
+//   vat58   — spend here counts toward the VAT 58 reclaim prompt for
+//             unregistered / flat-rate farmers (farm buildings, fencing,
+//             drainage). See services/tax/vat.js.
 //
 // The leaf slug a user picks is what gets stored in `expenses.category` (free
 // text) — so slugs are stable identifiers; labels are display-only and editable.
@@ -38,7 +45,7 @@ const DEFAULT_TEMPLATE = {
         { slug: 'meals', label: 'Meals' },
         { slug: 'utilities', label: 'Utilities' },
         { slug: 'software', label: 'Software' },
-        { slug: 'equipment', label: 'Equipment' },
+        { slug: 'equipment', label: 'Equipment', capital: true },
         { slug: 'professional', label: 'Professional' },
         { slug: 'other', label: 'Other' },
     ],
@@ -85,7 +92,7 @@ const CATEGORY_TEMPLATES = {
                     { slug: 'motor_tax_insurance', label: 'Motor Tax & Insurance' },
                 ],
             },
-            { slug: 'tack_equipment', label: 'Tack & Equipment' },
+            { slug: 'tack_equipment', label: 'Tack & Equipment', capital: true },
             { slug: 'insurance', label: 'Insurance' },
             { slug: 'professional', label: 'Professional Fees' },
             { slug: 'utilities', label: 'Utilities' },
@@ -116,7 +123,7 @@ const CATEGORY_TEMPLATES = {
                 slug: 'machinery',
                 label: 'Machinery & Equipment',
                 children: [
-                    { slug: 'machinery_purchase', label: 'Machinery (Capital)' },
+                    { slug: 'machinery_purchase', label: 'Machinery (Capital)', capital: true },
                     { slug: 'machinery_repairs', label: 'Repairs & Parts' },
                     { slug: 'plant_hire', label: 'Plant & Equipment Hire' },
                 ],
@@ -134,7 +141,7 @@ const CATEGORY_TEMPLATES = {
             { slug: 'land_rent', label: 'Land Rent & Conacre' },
             { slug: 'insurance', label: 'Insurance' },
             { slug: 'utilities', label: 'Utilities (ESB, Water)' },
-            { slug: 'building_fencing', label: 'Building & Fencing Repairs' },
+            { slug: 'building_fencing', label: 'Building & Fencing Repairs', vat58: true },
             { slug: 'professional', label: 'Professional Fees' },
             { slug: 'other', label: 'Other' },
         ],
@@ -170,7 +177,7 @@ const CATEGORY_TEMPLATES = {
                     { slug: 'mileage', label: 'Mileage' },
                 ],
             },
-            { slug: 'equipment', label: 'Equipment & Hardware' },
+            { slug: 'equipment', label: 'Equipment & Hardware', capital: true },
             { slug: 'training_cpd', label: 'Training & CPD' },
             { slug: 'marketing', label: 'Marketing & Website' },
             { slug: 'phone_internet', label: 'Phone & Internet' },
@@ -194,7 +201,7 @@ const CATEGORY_TEMPLATES = {
             { slug: 'packaging', label: 'Packaging & Postage' },
             { slug: 'marketing', label: 'Marketing & Advertising' },
             { slug: 'bank_card_fees', label: 'Bank & Card Fees' },
-            { slug: 'equipment_fixtures', label: 'Equipment & Fixtures' },
+            { slug: 'equipment_fixtures', label: 'Equipment & Fixtures', capital: true },
             { slug: 'insurance', label: 'Insurance' },
             {
                 slug: 'motor_delivery',
@@ -219,7 +226,7 @@ const CATEGORY_TEMPLATES = {
         expense: [
             { slug: 'materials', label: 'Materials' },
             { slug: 'subcontractor', label: 'Subcontractor Costs (RCT)' },
-            { slug: 'tools_equipment', label: 'Tools & Equipment' },
+            { slug: 'tools_equipment', label: 'Tools & Equipment', capital: true },
             { slug: 'plant_hire', label: 'Plant Hire' },
             {
                 slug: 'motor_fuel',
@@ -262,7 +269,7 @@ const CATEGORY_TEMPLATES = {
             { slug: 'cleaning_laundry', label: 'Cleaning & Laundry' },
             { slug: 'licences', label: 'Licences & Permits' },
             { slug: 'marketing', label: 'Marketing' },
-            { slug: 'equipment_furniture', label: 'Equipment & Furniture' },
+            { slug: 'equipment_furniture', label: 'Equipment & Furniture', capital: true },
             { slug: 'repairs_maintenance', label: 'Repairs & Maintenance' },
             { slug: 'insurance', label: 'Insurance' },
             { slug: 'bank_card_fees', label: 'Bank & Card Fees' },

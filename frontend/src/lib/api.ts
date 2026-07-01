@@ -142,6 +142,23 @@ export const api = {
     get: (receiptId: string) =>
       request<Receipt & { expenses: Expense[] }>(`/receipts/${receiptId}`),
   },
+  // Phase 5 asset register (capital items → wear & tear over 8 years).
+  assets: {
+    /** The caller org's register + the computed allowance schedule for a year. */
+    list: (year?: number) =>
+      request<AssetsResponse>(`/assets${year ? `?year=${year}` : ""}`),
+    /** Standalone register entry (opening balance / pre-app purchase). */
+    create: (data: CreateAssetData) =>
+      request<Asset>("/assets", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<CreateAssetData> & DisposalData) =>
+      request<Asset>(`/assets/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/assets/${id}`, { method: "DELETE" }),
+  },
+  reports: {
+    /** The caller org's full tax picture for a year (Form 11, capital allowances, VAT). */
+    taxSummary: (year?: number) =>
+      request<TaxSummary>(`/reports/tax-summary${year ? `?year=${year}` : ""}`),
+  },
   organisations: {
     get: (id: string) => request<Organisation>(`/organisations/${id}`),
     /** Effective category tree for the org plus the pristine type `defaults`. */
@@ -171,6 +188,11 @@ export const api = {
     getClientTransactions: (clientOrgId: string, year?: string | number) =>
       request<Expense[]>(
         `/accountant/clients/${clientOrgId}/transactions${year ? `?year=${year}` : ""}`,
+      ),
+    /** A client org's tax summary (same link gate as every client read). */
+    getClientTaxSummary: (clientOrgId: string, year?: number) =>
+      request<TaxSummary>(
+        `/accountant/clients/${clientOrgId}/tax-summary${year ? `?year=${year}` : ""}`,
       ),
     /** Authenticated export of a client org (zip = Excel + images, or csv). */
     exportClient: (clientOrgId: string, year: string | number, format: "zip" | "csv" = "zip") =>
@@ -257,8 +279,126 @@ export interface Expense {
   receipt_id: string | null;
   merchant_name: string | null;
   tax_amount: string | number | null;
+  /** True when an asset-register row is linked (capital item, Phase 5). */
+  is_capital?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// --- Capital assets & tax summary (Phase 5) --------------------------------
+
+export type AssetType = "plant_machinery" | "motor_vehicle";
+export type VatStatus = "not_registered" | "registered" | "flat_rate_farmer";
+
+/** A capital-asset register row. */
+export interface Asset {
+  id: string;
+  user_id: string;
+  /** Set when the asset was captured from an expense; null for opening balances. */
+  expense_id: string | null;
+  description: string;
+  category: string | null;
+  asset_type: AssetType;
+  cost: string | number;
+  currency: string;
+  acquired_date: string;
+  disposal_date: string | null;
+  disposal_proceeds: string | number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAssetData {
+  description: string;
+  asset_type?: AssetType;
+  cost: number;
+  currency?: string;
+  acquired_date?: string;
+  category?: string;
+}
+
+export interface DisposalData {
+  disposal_date?: string | null;
+  disposal_proceeds?: number | null;
+}
+
+/** One line of the wear & tear schedule for a year. */
+export interface AllowanceRow {
+  id: string;
+  expenseId: string | null;
+  description: string;
+  assetType: AssetType;
+  category: string | null;
+  cost: number;
+  allowableCost: number;
+  /** True when the €24k passenger-car cap reduced the allowable cost. */
+  capped: boolean;
+  acquiredDate: string;
+  disposalDate: string | null;
+  disposalProceeds: number | null;
+  /** 1..8 — which year of the write-off this is. */
+  yearIndex: number;
+  allowance: number;
+  openingWdv: number;
+  closingWdv: number;
+  disposed: boolean;
+}
+
+export interface CapitalAllowances {
+  rows: AllowanceRow[];
+  totals: { cost: number; allowance: number; closingWdv: number };
+}
+
+export interface AssetsResponse {
+  year: number;
+  assets: Asset[];
+  schedule: CapitalAllowances;
+}
+
+export interface Form11Bucket {
+  key: string;
+  label: string;
+  total: number;
+  categories: { slug: string; label: string; total: number; count: number }[];
+}
+
+export interface VatPosition {
+  vatStatus: VatStatus;
+  inputVatReclaimable: boolean;
+  vatOnPurchases: number;
+  vatOnIncome: number;
+  /** The flat-rate addition for the year (flat-rate farmers only). */
+  flatRateAddition: number | null;
+  /** Spend in VAT 58-eligible categories (buildings/fencing/drainage). */
+  vat58EligibleSpend: number;
+}
+
+/** The full year picture returned by /reports/tax-summary and the accountant twin. */
+export interface TaxSummary {
+  year: number;
+  orgId: string;
+  orgName: string;
+  orgCategory: string;
+  vatStatus: VatStatus;
+  totals: {
+    income: number;
+    revenueExpenses: number;
+    capitalExpenditure: number;
+    wearAndTear: number;
+    netBeforeAdjustments: number;
+  };
+  counts: {
+    transactions: number;
+    income: number;
+    revenue: number;
+    capital: number;
+    assets: number;
+  };
+  byCategory: { slug: string; label: string; total: number; count: number }[];
+  form11: Form11Bucket[];
+  capitalAllowances: CapitalAllowances;
+  vat: VatPosition;
+  capitalExpenseIds: string[];
 }
 
 // --- Receipts (Phase 2 camera-first capture) -------------------------------
@@ -318,6 +458,10 @@ export interface ReceiptLineItemInput {
   currency?: string;
   merchant_name?: string;
   tax_amount?: number;
+  /** Capital item: also writes an asset-register row (wear & tear over 8 yrs). */
+  is_capital?: boolean;
+  asset_type?: AssetType;
+  asset_description?: string;
 }
 
 export interface CreateExpenseData {
@@ -329,6 +473,14 @@ export interface CreateExpenseData {
   image?: string; // base64 data URL; backend uploads it and stores the object path
   /** Transaction date as YYYY-MM-DD; maps to created_at on the backend. */
   date?: string;
+  /**
+   * Capital item marker. Create: true also writes an asset-register row.
+   * Update (PATCH): tri-state — true upserts the linked asset, false removes
+   * it, omitted leaves the register alone.
+   */
+  is_capital?: boolean;
+  asset_type?: AssetType;
+  asset_description?: string;
 }
 
 export type UpdateExpenseData = Partial<CreateExpenseData>;
@@ -368,6 +520,7 @@ export interface OrganisationInput {
   /** Derived from org_category on the backend when omitted. */
   type?: "personal" | "business";
   org_category?: string;
+  vat_status?: VatStatus;
 }
 
 /** Organisation row returned by the backend. */
@@ -386,6 +539,8 @@ export interface Organisation {
   is_accountant_practice?: boolean;
   /** Lifecycle status; a suspended org's users cannot log in. */
   status?: "active" | "suspended";
+  /** VAT treatment — drives the VAT section of the tax summary. */
+  vat_status?: VatStatus;
   created_at?: string;
   updated_at?: string;
 }
@@ -468,6 +623,10 @@ export interface CategoryNode {
   slug: string;
   label: string;
   children?: CategoryNode[];
+  /** Suggests "capital item" in the transaction form (never enforced). */
+  capital?: boolean;
+  /** Spend here counts toward the VAT 58 farmer-reclaim prompt. */
+  vat58?: boolean;
 }
 
 export interface CategoryTree {

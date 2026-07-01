@@ -1,5 +1,6 @@
 const expenseModel = require('../models/expenseModel');
 const userModel = require('../models/userModel');
+const assetModel = require('../models/assetModel');
 const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
 const { getSignedUrl } = require('../utils/signedUrl');
@@ -12,6 +13,60 @@ const gf = require('../utils/gf');
 // Phase 0 tenant scoping. super_admin bypasses org scoping (null = unscoped);
 // everyone else is restricted to expenses whose user_id is in their org.
 const scopeOrgIdFor = (req) => (isSuperAdmin(req) ? null : req.user.orgId);
+
+// Phase 5 capital items. A truthy `is_capital` on a create/update marks the
+// expense as capital expenditure: a linked asset-register row is written and
+// the amount is claimed via wear & tear (12.5%/yr over 8 years) instead of as
+// a revenue expense. `asset_type` is sanitised, never trusted raw (a typo must
+// not 500 on the DB CHECK).
+const ASSET_TYPES = ['plant_machinery', 'motor_vehicle'];
+const sanitiseAssetType = (t) => (ASSET_TYPES.includes(t) ? t : 'plant_machinery');
+
+// Extract the optional asset payload from a create request body.
+const assetPayloadFrom = (body) =>
+    body && body.is_capital === true
+        ? {
+            description: body.asset_description || undefined,
+            asset_type: sanitiseAssetType(body.asset_type),
+        }
+        : null;
+
+// PATCH semantics for `is_capital` (tri-state): true upserts the linked asset
+// (its cost/category/date follow the expense), false removes it, absent leaves
+// it untouched.
+const syncCapitalFlag = async (req, expense) => {
+    const { is_capital, asset_type, asset_description } = req.body;
+    if (is_capital !== true && is_capital !== false) return;
+    const scopeOrgId = scopeOrgIdFor(req);
+
+    if (is_capital === false) {
+        await assetModel.deleteAssetByExpenseId(req.pool, expense.id, scopeOrgId);
+        return;
+    }
+
+    const existing = await assetModel.getAssetByExpenseId(req.pool, expense.id, scopeOrgId);
+    if (existing) {
+        await assetModel.updateAsset(req.pool, existing.id, {
+            description: asset_description || existing.description,
+            category: expense.category,
+            asset_type: asset_type !== undefined ? sanitiseAssetType(asset_type) : existing.asset_type,
+            cost: expense.amount,
+            currency: expense.currency,
+            acquired_date: expense.created_at,
+        }, scopeOrgId);
+    } else {
+        await assetModel.createAsset(req.pool, {
+            user_id: expense.user_id,
+            expense_id: expense.id,
+            description: asset_description || expense.title || expense.merchant_name || 'Asset',
+            category: expense.category,
+            asset_type: sanitiseAssetType(asset_type),
+            cost: expense.amount,
+            currency: expense.currency,
+            acquired_date: expense.created_at,
+        });
+    }
+};
 
 // Reject access to a target user's data when that user is not in the caller's
 // org (and the caller is not a super_admin). Returns true if access is denied
@@ -45,7 +100,11 @@ const createExpense = async (req, res) => {
 
             expenseData.receipt_image_url = req.body.image;
 
-            const newExpense = await expenseModel.createExpense(req.pool, expenseData);
+            // Capital item → expense + asset-register row in one transaction.
+            const asset = assetPayloadFrom(req.body);
+            const newExpense = asset
+                ? (await expenseModel.createExpensesWithAssets(req.pool, [{ expense: expenseData, asset }]))[0]
+                : await expenseModel.createExpense(req.pool, expenseData);
             logger.info('Expense created successfully', newExpense);
             res.status(201).json(newExpense);
         });
@@ -268,11 +327,13 @@ const partialUpdateExpense = async (req, res) => {
                     return res.status(400).json({ error: err.message });
                 }
                 const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, true, scopeOrgId);
+                await syncCapitalFlag(req, newExpense);
                 logger.info('Expense updated successfully', newExpense);
                 res.status(201).json(newExpense);
             });
         } else {
             const newExpense = await expenseModel.partialUpdateExpense(req.pool, id, expenseData, false, scopeOrgId);
+            await syncCapitalFlag(req, newExpense);
             logger.info('Expense updated successfully', newExpense);
             res.status(201).json(newExpense);
         }

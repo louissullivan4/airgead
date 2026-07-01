@@ -127,22 +127,33 @@ const createReceiptExpenses = async (req, res) => {
             }
         }
 
-        const created = [];
-        for (const item of items) {
-            const expense = await expenseModel.createExpense(req.pool, {
-                user_id: userId,
-                title: item.title || receipt.merchant_name || null,
-                description: item.description ?? null,
-                category: item.category,
-                amount: item.amount,
-                currency: item.currency || receipt.currency || 'EUR',
-                receipt_image_url: null, // image lives on the receipt; fetched via image-url
-                receipt_id: receipt.id,
-                merchant_name: item.merchant_name || receipt.merchant_name || null,
-                tax_amount: item.tax_amount ?? null,
-            });
-            created.push(expense);
-        }
+        // All lines (and any capital asset-register rows they carry) are written
+        // in ONE transaction — a multi-line save is all-or-nothing.
+        const ASSET_TYPES = ['plant_machinery', 'motor_vehicle'];
+        const created = await expenseModel.createExpensesWithAssets(
+            req.pool,
+            items.map((item) => ({
+                expense: {
+                    user_id: userId,
+                    title: item.title || receipt.merchant_name || null,
+                    description: item.description ?? null,
+                    category: item.category,
+                    amount: item.amount,
+                    currency: item.currency || receipt.currency || 'EUR',
+                    receipt_image_url: null, // image lives on the receipt; fetched via image-url
+                    receipt_id: receipt.id,
+                    merchant_name: item.merchant_name || receipt.merchant_name || null,
+                    tax_amount: item.tax_amount ?? null,
+                },
+                asset: item.is_capital === true
+                    ? {
+                        description: item.asset_description || undefined,
+                        asset_type: ASSET_TYPES.includes(item.asset_type) ? item.asset_type : 'plant_machinery',
+                        acquired_date: receipt.receipt_date || null,
+                    }
+                    : null,
+            }))
+        );
 
         logger.info('Created %d line item(s) for receipt %s', created.length, receipt.id);
         res.status(201).json(created);

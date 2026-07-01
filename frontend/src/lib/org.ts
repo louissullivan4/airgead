@@ -97,6 +97,57 @@ export function firstLeafSlug(
   return "other";
 }
 
+// --- Phase 5: capital-item suggestion + VAT status ---------------------------
+
+/**
+ * Fallback for org trees stored before the `capital` node flag existed —
+ * equipment-like leaves across the templates. The flag/set only drives a UI
+ * suggestion (pre-ticking "Capital item"); the user always decides.
+ */
+export const KNOWN_CAPITAL_SLUGS = new Set([
+  "equipment",
+  "machinery_purchase",
+  "equipment_fixtures",
+  "tools_equipment",
+  "equipment_furniture",
+  "tack_equipment",
+]);
+
+/** Every expense-side slug that should suggest "capital item" for this org. */
+export function capitalSlugSet(tree: CategoryTree | undefined): Set<string> {
+  const slugs = new Set(KNOWN_CAPITAL_SLUGS);
+  const walk = (nodes: CategoryNode[] | undefined) =>
+    nodes?.forEach((n) => {
+      if (n.capital) slugs.add(n.slug);
+      walk(n.children);
+    });
+  walk(tree?.expense);
+  return slugs;
+}
+
+export const VAT_STATUS_OPTIONS: { value: string; label: string; hint: string }[] = [
+  {
+    value: "not_registered",
+    label: "Not VAT registered",
+    hint: "Below the registration thresholds — VAT is simply part of your costs.",
+  },
+  {
+    value: "registered",
+    label: "VAT registered",
+    hint: "You file VAT returns and reclaim VAT on purchases.",
+  },
+  {
+    value: "flat_rate_farmer",
+    label: "Flat-rate farmer",
+    hint: "Unregistered farmer — you add the flat-rate % to sales instead of reclaiming VAT.",
+  },
+];
+
+export const ASSET_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "plant_machinery", label: "Plant & machinery" },
+  { value: "motor_vehicle", label: "Motor vehicle (car)" },
+];
+
 /** Slugify a label for a newly-created category (existing slugs are preserved on rename). */
 export function slugify(label: string): string {
   return (

@@ -36,9 +36,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   // Nav gating (hidden entirely for solo personal users):
   //  - Clients: accountancy practice orgs, or platform super_admins.
   //  - Team: owners of a business org (members roll up to it).
+  //  - Tax summary: business orgs (Form 11 / capital allowances / VAT).
   const isSuperAdmin = session?.platformRole === "super_admin";
   const showClients = Boolean(org?.is_accountant_practice) || isSuperAdmin;
   const showTeam = org?.type === "business" && session?.orgRole === "owner";
+  const showReports = org?.type === "business";
 
   return (
     <div className="min-h-dvh">
@@ -49,6 +51,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         showClients={showClients}
         showTeam={showTeam}
         showAdmin={isSuperAdmin}
+        showReports={showReports}
       />
       <MobileTopBar name={name} email={email} onSupport={onSupport} />
 

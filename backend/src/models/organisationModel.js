@@ -3,7 +3,7 @@ const { ORG_CATEGORY_SLUGS, getTemplateFor } = require('../config/categoryTempla
 
 // Columns an owner may edit via PATCH /organisations/:id. `categories` is
 // handled specially (jsonb).
-const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 'type', 'org_category', 'categories', 'status'];
+const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 'type', 'org_category', 'categories', 'status', 'vat_status'];
 
 // Phase 1 signup provisioning. A new account must belong to an organisation or
 // its JWT will lack orgId and be rejected by authMiddleware (the Phase 0 gap).

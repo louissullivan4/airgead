@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
+  Landmark,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -92,6 +93,15 @@ function TransactionsTable({
             </td>
             <td className="px-3 py-3">
               <CategoryBadge category={e.category} />
+              {e.is_capital && (
+                <span
+                  className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border"
+                  title="Capital item — claimed via wear & tear over 8 years"
+                >
+                  <Landmark className="size-3" />
+                  Capital
+                </span>
+              )}
             </td>
             <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
               {new Date(e.created_at).toLocaleDateString()}

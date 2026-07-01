@@ -75,11 +75,12 @@ describe('receiptController', () => {
     });
 
     describe('POST /receipts/:id/expenses', () => {
-        it('creates one expense per line item, all linked to the same receipt_id', async () => {
+        it('creates one expense per line item, all linked to the same receipt_id, in ONE transactional call', async () => {
             sinon.stub(receiptModel, 'getReceiptById').resolves({
                 id: 'receipt-1', merchant_name: 'Cafe', currency: 'EUR',
             });
-            const createExpense = sinon.stub(expenseModel, 'createExpense').callsFake((pool, e) => Promise.resolve({ id: 'x', ...e }));
+            const createBatch = sinon.stub(expenseModel, 'createExpensesWithAssets')
+                .callsFake((pool, items) => Promise.resolve(items.map((i, n) => ({ id: `x${n}`, ...i.expense }))));
 
             const req = {
                 pool: {},
@@ -94,17 +95,49 @@ describe('receiptController', () => {
 
             await receiptController.createReceiptExpenses(req, res);
 
-            expect(createExpense.callCount).toBe(2);
-            expect(createExpense.getCall(0).args[1].receipt_id).toBe('receipt-1');
-            expect(createExpense.getCall(1).args[1].receipt_id).toBe('receipt-1');
+            expect(createBatch.calledOnce).toBe(true);
+            const items = createBatch.firstCall.args[1];
+            expect(items).toHaveLength(2);
+            expect(items[0].expense.receipt_id).toBe('receipt-1');
+            expect(items[1].expense.receipt_id).toBe('receipt-1');
+            // no capital markers -> no asset payloads
+            expect(items[0].asset).toBeNull();
+            expect(items[1].asset).toBeNull();
             expect(res.status.calledWith(201)).toBe(true);
             expect(res.json.firstCall.args[0]).toHaveLength(2);
+        });
+
+        it('passes a sanitised asset payload for a capital line item', async () => {
+            sinon.stub(receiptModel, 'getReceiptById').resolves({
+                id: 'receipt-1', merchant_name: 'Agri Stores', currency: 'EUR', receipt_date: '2026-02-01',
+            });
+            const createBatch = sinon.stub(expenseModel, 'createExpensesWithAssets')
+                .callsFake((pool, items) => Promise.resolve(items.map((i, n) => ({ id: `x${n}`, ...i.expense }))));
+
+            const req = {
+                pool: {},
+                params: { id: 'receipt-1' },
+                body: { items: [
+                    { category: 'machinery_purchase', amount: 5200, is_capital: true, asset_type: 'bogus-type' },
+                ] },
+                user: { userId: 'user-A', orgId: 'org-A', platformRole: 'user' },
+            };
+            const res = makeRes();
+
+            await receiptController.createReceiptExpenses(req, res);
+
+            const items = createBatch.firstCall.args[1];
+            expect(items[0].asset).toEqual(expect.objectContaining({
+                asset_type: 'plant_machinery',       // bogus value sanitised, never trusted raw
+                acquired_date: '2026-02-01',         // falls back to the receipt date
+            }));
+            expect(res.status.calledWith(201)).toBe(true);
         });
 
         it('returns 404 when the receipt is not visible to the caller org', async () => {
             // out-of-org receipt -> org-scoped lookup returns null
             sinon.stub(receiptModel, 'getReceiptById').resolves(null);
-            const createExpense = sinon.stub(expenseModel, 'createExpense').resolves({});
+            const createBatch = sinon.stub(expenseModel, 'createExpensesWithAssets').resolves([]);
 
             const req = {
                 pool: {},
@@ -117,12 +150,12 @@ describe('receiptController', () => {
             await receiptController.createReceiptExpenses(req, res);
 
             expect(res.status.calledWith(404)).toBe(true);
-            expect(createExpense.notCalled).toBe(true);
+            expect(createBatch.notCalled).toBe(true);
         });
 
         it('rejects an item missing category/amount with 400', async () => {
             sinon.stub(receiptModel, 'getReceiptById').resolves({ id: 'receipt-1' });
-            const createExpense = sinon.stub(expenseModel, 'createExpense').resolves({});
+            const createBatch = sinon.stub(expenseModel, 'createExpensesWithAssets').resolves([]);
 
             const req = {
                 pool: {},
@@ -135,7 +168,7 @@ describe('receiptController', () => {
             await receiptController.createReceiptExpenses(req, res);
 
             expect(res.status.calledWith(400)).toBe(true);
-            expect(createExpense.notCalled).toBe(true);
+            expect(createBatch.notCalled).toBe(true);
         });
     });
 

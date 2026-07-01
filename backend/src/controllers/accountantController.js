@@ -8,6 +8,7 @@ const accountantLinkModel = require('../models/accountantLinkModel');
 const { isSuperAdmin } = require('../middlewares/tenantScope');
 const { sendInviteEmail } = require('./userController');
 const { downloadImages, createZipArchive } = require('../middlewares/imageDownload');
+const { buildTaxSummary } = require('../services/tax/taxSummaryService');
 const gf = require('../utils/gf');
 const logger = require('../utils/logger');
 
@@ -107,9 +108,11 @@ const getClientTransactions = async (req, res) => {
 };
 
 // Minimal RFC-4180-ish CSV from the expense rows (same columns as the Excel
-// export, minus the embedded images).
-const toCsv = (expenses) => {
-    const headers = ['ID', 'Title', 'Description', 'Category', 'Amount', 'Currency', 'Date', 'Merchant', 'Tax'];
+// export, minus the embedded images). `capitalIds` marks asset-register-linked
+// rows so the accountant can see at a glance what is claimed via wear & tear
+// rather than as a revenue expense.
+const toCsv = (expenses, capitalIds = new Set()) => {
+    const headers = ['ID', 'Title', 'Description', 'Category', 'Amount', 'Currency', 'Date', 'Merchant', 'Tax', 'Capital'];
     const esc = (v) => {
         const s = v === null || v === undefined ? '' : String(v);
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -117,6 +120,7 @@ const toCsv = (expenses) => {
     const rows = expenses.map((e) => [
         e.id, e.title, e.description, e.category, e.amount, e.currency,
         e.created_at, e.merchant_name, e.tax_amount,
+        capitalIds.has(e.id) ? 'yes' : '',
     ].map(esc).join(','));
     return [headers.join(','), ...rows].join('\n');
 };
@@ -137,10 +141,19 @@ const exportClient = async (req, res) => {
             return res.status(404).json({ message: 'No transactions found for the given client and year.' });
         }
 
+        // The tax-season pack: Form 11 buckets, capital-allowances schedule and
+        // VAT position ride along with the raw rows (extra Excel sheets + a
+        // Capital marker column). Never let a summary failure kill the export.
+        const summary = await buildTaxSummary(req.pool, clientOrgId, year).catch((err) => {
+            logger.error('Tax summary failed during export (continuing without): %s', err.message);
+            return null;
+        });
+        const capitalIds = new Set((summary && summary.capitalExpenseIds) || []);
+
         if (format === 'csv') {
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', `attachment; filename="client_${clientOrgId}_${year}.csv"`);
-            return res.status(200).send(toCsv(expenses));
+            return res.status(200).send(toCsv(expenses, capitalIds));
         }
 
         const timestamp = Date.now();
@@ -152,7 +165,7 @@ const exportClient = async (req, res) => {
         try {
             await fs.ensureDir(imagesDir);
             await downloadImages(expenses, imagesDir);
-            await gf.generateExcel(expenses, imagesDir, excelFilePath);
+            await gf.generateExcel(expenses, imagesDir, excelFilePath, summary);
             await createZipArchive([excelFilePath, imagesDir], zipFilePath);
 
             res.download(zipFilePath, `client_transactions_${year}.zip`, async (err) => {
@@ -168,6 +181,26 @@ const exportClient = async (req, res) => {
     } catch (error) {
         logger.error('Error exporting client data: %s', error.message);
         if (!res.headersSent) res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+// GET /accountant/clients/:clientOrgId/tax-summary?year= — the client's full
+// tax picture (Form 11 buckets, capital allowances, VAT position). Same link
+// gate as every other client read.
+const getClientTaxSummary = async (req, res) => {
+    try {
+        const { clientOrgId } = req.params;
+        if (!(await assertClientAccess(req, res, clientOrgId))) return;
+
+        const year = parseInt(req.query.year, 10) || TAX_YEAR();
+        const summary = await buildTaxSummary(req.pool, clientOrgId, year);
+        if (!summary) {
+            return res.status(404).json({ error: 'Organisation not found.' });
+        }
+        res.status(200).json(summary);
+    } catch (error) {
+        logger.error('Error building client tax summary: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
     }
 };
 
@@ -226,6 +259,7 @@ module.exports = {
     inviteClient,
     listClients,
     getClientTransactions,
+    getClientTaxSummary,
     exportClient,
     revokeClient,
     reassignClient,

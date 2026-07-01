@@ -56,6 +56,43 @@ const orgCategoryLabel = (slug: string) =>
 
 const num = (v: string | number) => Number(v) || 0;
 
+// Readiness at a glance — the tax-season "nothing to chase" signal, derived
+// from the stats already on the row (this tax year's records).
+const QUIET_AFTER_DAYS = 60;
+
+function readinessOf(c: ClientSummary): { tone: string; dot: string; label: string; hint: string } {
+  if (num(c.txn_count) === 0) {
+    return {
+      tone: "text-destructive",
+      dot: "bg-destructive",
+      label: "No records",
+      hint: "Nothing captured this tax year",
+    };
+  }
+  const days = c.last_activity
+    ? Math.floor((Date.now() - new Date(c.last_activity).getTime()) / 86_400_000)
+    : Infinity;
+  if (days > QUIET_AFTER_DAYS) {
+    return {
+      tone: "text-amber-600 dark:text-amber-500",
+      dot: "bg-amber-500",
+      label: "Gone quiet",
+      hint: `Last record ${days === Infinity ? "a while" : `${days} days`} ago`,
+    };
+  }
+  return { tone: "text-success", dot: "bg-success", label: "Up to date", hint: "Capturing recently" };
+}
+
+function ReadinessBadge({ client }: { client: ClientSummary }) {
+  const r = readinessOf(client);
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${r.tone}`} title={r.hint}>
+      <span className={`size-1.5 rounded-full ${r.dot}`} />
+      {r.label}
+    </span>
+  );
+}
+
 export default function ClientsPage() {
   const { session } = useSession();
   // Firm admin (org owner) or super_admin sees all clients + can reassign.
@@ -202,6 +239,7 @@ export default function ClientsPage() {
             <thead>
               <tr className="border-b border-border text-xs font-medium text-muted-foreground">
                 <th className="px-3 py-2.5 text-left">Client</th>
+                <th className="px-3 py-2.5 text-left">Status</th>
                 {isAdmin && <th className="px-3 py-2.5 text-left">Accountant</th>}
                 <th className="px-3 py-2.5 text-right">Expense</th>
                 <th className="px-3 py-2.5 text-right">Income</th>
@@ -226,6 +264,9 @@ export default function ClientsPage() {
                       <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
                         {orgCategoryLabel(c.org_category)}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <ReadinessBadge client={c} />
                     </td>
                     {isAdmin && (
                       <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">

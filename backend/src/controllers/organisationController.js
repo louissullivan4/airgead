@@ -76,12 +76,20 @@ const getCategories = async (req, res) => {
     }
 };
 
+// VAT treatments the tax summary understands (mirrors the DB CHECK from
+// migration 009 — validate here so a typo 400s instead of 500ing).
+const VAT_STATUSES = ['not_registered', 'registered', 'flat_rate_farmer'];
+
 // Owner-only (enforced by requireOrgRole('owner') on the route) + org-scoped.
 const updateOrganisation = async (req, res) => {
     if (!allowOrgAccess(req, res)) return;
 
     if (req.body.categories !== undefined && !isValidCategoryTree(req.body.categories)) {
         return res.status(400).json({ error: 'Invalid categories: expected { expense: [...], income: [...] }.' });
+    }
+
+    if (req.body.vat_status !== undefined && !VAT_STATUSES.includes(req.body.vat_status)) {
+        return res.status(400).json({ error: `Invalid vat_status: expected one of ${VAT_STATUSES.join(', ')}.` });
     }
 
     try {

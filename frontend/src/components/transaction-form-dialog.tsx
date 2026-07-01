@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Landmark, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
   amountOf,
   isIncome,
+  type AssetType,
   type CreateExpenseData,
   type Expense,
   type ReceiptLineItemInput,
@@ -14,7 +15,13 @@ import {
 } from "@/lib/api";
 import { CURRENCIES } from "@/lib/categories";
 import { OCR_AUTOFILL_ENABLED } from "@/lib/constants";
-import { categoryOptions, firstLeafSlug, type CategoryOption } from "@/lib/org";
+import {
+  ASSET_TYPE_OPTIONS,
+  capitalSlugSet,
+  categoryOptions,
+  firstLeafSlug,
+  type CategoryOption,
+} from "@/lib/org";
 import { useOrgCategories } from "@/lib/use-org-categories";
 import {
   Dialog,
@@ -97,6 +104,63 @@ function CategorySelect({
   );
 }
 
+// Capital-item toggle (Phase 5). Marks the expense as capital expenditure —
+// it joins the asset register and is claimed via wear & tear (12.5%/yr over 8
+// years) instead of as a revenue expense. Pre-ticked when the chosen category
+// is capital-flagged; always the user's call.
+function CapitalToggle({
+  id,
+  checked,
+  onCheckedChange,
+  assetType,
+  onAssetTypeChange,
+}: {
+  id: string;
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  assetType: AssetType;
+  onAssetTypeChange: (v: AssetType) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-2.5">
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onCheckedChange(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+        />
+        <span className="text-sm">
+          <span className="flex items-center gap-1.5 font-medium">
+            <Landmark className="size-3.5 text-muted-foreground" />
+            Capital item
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Equipment, machinery, vehicles — claimed over 8 years via the asset register.
+          </span>
+        </span>
+      </label>
+      {checked && (
+        <div className="mt-2 pl-6">
+          <Select value={assetType} onValueChange={(v) => onAssetTypeChange(v as AssetType)}>
+            <SelectTrigger aria-label="Asset type" className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ASSET_TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const LOW_CONFIDENCE = 0.7;
 
 // Dormant auto-fill affordance: a low-confidence warning on an editable field.
@@ -117,6 +181,8 @@ interface LineDraft {
   category: string;
   amount: string;
   description: string;
+  isCapital: boolean;
+  assetType: AssetType;
 }
 
 /** Local YYYY-MM-DD for a date input (avoids the UTC shift of toISOString). */
@@ -141,6 +207,7 @@ function TransactionFormDialog({
   const autofill = OCR_AUTOFILL_ENABLED && Boolean(parsed);
   const { tree } = useOrgCategories();
   const expenseOptions = categoryOptions(tree, "expense");
+  const capitalSlugs = useMemo(() => capitalSlugSet(tree), [tree]);
 
   // --- legacy single-item state (edit + skip-photo paths) ---
   const [type, setType] = useState<"expense" | "income">("expense");
@@ -151,6 +218,8 @@ function TransactionFormDialog({
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => toDateInput());
   const [image, setImage] = useState<string | undefined>(undefined);
+  const [isCapital, setIsCapital] = useState(false);
+  const [assetType, setAssetType] = useState<AssetType>("plant_machinery");
 
   // --- receipt multi-line state ---
   const [merchant, setMerchant] = useState("");
@@ -169,6 +238,7 @@ function TransactionFormDialog({
       setCurrency(expense.currency || defaultCurrency);
       setDescription(expense.description ?? "");
       setDate(toDateInput(expense.created_at));
+      setIsCapital(Boolean(expense.is_capital));
     } else {
       setType("expense");
       setTitle("");
@@ -176,7 +246,9 @@ function TransactionFormDialog({
       setCurrency(defaultCurrency);
       setDescription("");
       setDate(toDateInput());
+      setIsCapital(false);
     }
+    setAssetType("plant_machinery");
     setImage(undefined);
   }, [open, expense, defaultCurrency]);
 
@@ -208,29 +280,39 @@ function TransactionFormDialog({
           category: it.category || leaf,
           amount: it.amount ? String(it.amount) : "",
           description: "",
+          isCapital: capitalSlugs.has(it.category || leaf),
+          assetType: "plant_machinery",
         })),
       );
     } else {
       setMerchant("");
       setCurrency(defaultCurrency);
-      setLines([{ key: 0, title: "", category: leaf, amount: "", description: "" }]);
+      setLines([{
+        key: 0, title: "", category: leaf, amount: "", description: "",
+        isCapital: capitalSlugs.has(leaf), assetType: "plant_machinery",
+      }]);
     }
-  }, [open, receiptMode, autofill, parsed, tree, defaultCurrency]);
+  }, [open, receiptMode, autofill, parsed, tree, defaultCurrency, capitalSlugs]);
 
   const updateLine = (key: number, patch: Partial<LineDraft>) =>
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const addLine = () =>
-    setLines((prev) => [
-      ...prev,
-      {
-        key: (prev.at(-1)?.key ?? 0) + 1,
-        title: "",
-        category: firstLeafSlug(tree, "expense"),
-        amount: "",
-        description: "",
-      },
-    ]);
+    setLines((prev) => {
+      const leaf = firstLeafSlug(tree, "expense");
+      return [
+        ...prev,
+        {
+          key: (prev.at(-1)?.key ?? 0) + 1,
+          title: "",
+          category: leaf,
+          amount: "",
+          description: "",
+          isCapital: capitalSlugs.has(leaf),
+          assetType: "plant_machinery",
+        },
+      ];
+    });
 
   const removeLine = (key: number) =>
     setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev));
@@ -250,6 +332,8 @@ function TransactionFormDialog({
         amount: numeric,
         currency,
         merchant_name: merchant.trim() || undefined,
+        is_capital: l.isCapital || undefined,
+        asset_type: l.isCapital ? l.assetType : undefined,
       });
     }
     setSaving(true);
@@ -271,6 +355,7 @@ function TransactionFormDialog({
       toast.error("Add a title and a non-zero amount.");
       return;
     }
+    const capital = type === "expense" && isCapital;
     const payload: CreateExpenseData = {
       title: title.trim(),
       description: description || undefined,
@@ -279,6 +364,11 @@ function TransactionFormDialog({
       currency,
       image,
       date: date || undefined,
+      // Create: only a true marker matters. Edit: send the explicit boolean so
+      // the backend's tri-state PATCH can also UN-mark (false deletes the
+      // linked asset; omitted would leave it untouched).
+      is_capital: editing ? capital : capital || undefined,
+      asset_type: capital ? assetType : undefined,
     };
     setSaving(true);
     try {
@@ -387,7 +477,10 @@ function TransactionFormDialog({
                       <CategorySelect
                         id={`line-cat-${l.key}`}
                         value={l.category}
-                        onValueChange={(v) => updateLine(l.key, { category: v })}
+                        onValueChange={(v) =>
+                          // Changing category re-derives the capital suggestion.
+                          updateLine(l.key, { category: v, isCapital: capitalSlugs.has(v) })
+                        }
                         options={expenseOptions}
                       />
                     </Field>
@@ -404,6 +497,13 @@ function TransactionFormDialog({
                       />
                     </Field>
                   </div>
+                  <CapitalToggle
+                    id={`line-capital-${l.key}`}
+                    checked={l.isCapital}
+                    onCheckedChange={(v) => updateLine(l.key, { isCapital: v })}
+                    assetType={l.assetType}
+                    onAssetTypeChange={(v) => updateLine(l.key, { assetType: v })}
+                  />
                 </div>
               ))}
             </div>
@@ -435,14 +535,27 @@ function TransactionFormDialog({
             </Field>
 
             {type === "expense" && (
-              <Field label="Category" htmlFor="tx-category">
-                <CategorySelect
-                  id="tx-category"
-                  value={category}
-                  onValueChange={setCategory}
-                  options={expenseOptions}
+              <>
+                <Field label="Category" htmlFor="tx-category">
+                  <CategorySelect
+                    id="tx-category"
+                    value={category}
+                    onValueChange={(v) => {
+                      setCategory(v);
+                      // Re-derive the suggestion on an explicit category change.
+                      setIsCapital(capitalSlugs.has(v));
+                    }}
+                    options={expenseOptions}
+                  />
+                </Field>
+                <CapitalToggle
+                  id="tx-capital"
+                  checked={isCapital}
+                  onCheckedChange={setIsCapital}
+                  assetType={assetType}
+                  onAssetTypeChange={setAssetType}
                 />
-              </Field>
+              </>
             )}
 
             <div className="grid grid-cols-[1fr_7rem] gap-3">

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(///wsl.localhost/Ubuntu/home/stew/code/rian/docs/**)",
+      "Read(///wsl.localhost/Ubuntu/home/stew/code/**)",
+      "Skill(update-config)",
+      "Bash(node *)",
+      "Bash(wsl *)",
+      "Bash(command -v docker)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\"; \"started\")",
+      "Bash(docker info *)",
+      "Bash(docker run *)",
+      "Bash(docker exec *)",
+      "Bash(docker stop *)"
+    ]
+  }
+}

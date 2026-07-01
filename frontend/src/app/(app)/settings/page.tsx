@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, type Organisation, type UserProfile } from "@/lib/api";
 import { CURRENCIES } from "@/lib/categories";
-import { COUNTRIES, ORG_CATEGORIES } from "@/lib/org";
+import { COUNTRIES, ORG_CATEGORIES, VAT_STATUS_OPTIONS } from "@/lib/org";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { OrgCategoriesEditor } from "@/components/org-categories-editor";
@@ -119,6 +119,7 @@ export default function SettingsPage() {
         vat_number: orgForm.vat_number ?? "",
         org_category,
         type,
+        vat_status: orgForm.vat_status ?? org.vat_status ?? "not_registered",
       });
       setOrg(updated);
       setOrgForm(updated);
@@ -300,6 +301,32 @@ export default function SettingsPage() {
                 </Field>
               )}
             </div>
+            <Field
+              label="VAT status"
+              htmlFor="org-vat-status"
+              hint={
+                VAT_STATUS_OPTIONS.find(
+                  (o) => o.value === (orgForm.vat_status ?? "not_registered"),
+                )?.hint
+              }
+            >
+              <Select
+                value={orgForm.vat_status ?? "not_registered"}
+                disabled={!isOwner}
+                onValueChange={(v) => updateOrg("vat_status", v)}
+              >
+                <SelectTrigger id="org-vat-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VAT_STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
             {isOwner && (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">

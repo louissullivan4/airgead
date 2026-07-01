@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS organisations (
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS org_category text NOT NULL DEFAULT 'personal';
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS is_accountant_practice boolean NOT NULL DEFAULT false;
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS vat_status text NOT NULL DEFAULT 'not_registered';
 
 CREATE TABLE IF NOT EXISTS users (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -123,6 +124,24 @@ CREATE TABLE IF NOT EXISTS expenses (
     updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
+-- Phase 5: capital-asset register. An expense is capital iff an assets row
+-- references it; wear & tear is computed from these rows, never stored.
+CREATE TABLE IF NOT EXISTS assets (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id            uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expense_id         uuid REFERENCES expenses(id) ON DELETE CASCADE,
+    description        text NOT NULL,
+    category           text,
+    asset_type         text NOT NULL DEFAULT 'plant_machinery' CHECK (asset_type IN ('plant_machinery','motor_vehicle')),
+    cost               numeric(12,2) NOT NULL,
+    currency           text NOT NULL DEFAULT 'EUR',
+    acquired_date      date NOT NULL,
+    disposal_date      date,
+    disposal_proceeds  numeric(12,2),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS user_invites (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email              text NOT NULL,
@@ -154,6 +173,8 @@ END$$;
 
 CREATE INDEX IF NOT EXISTS idx_users_org_id ON users(org_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
+CREATE INDEX IF NOT EXISTS idx_assets_user_id ON assets(user_id);
+CREATE INDEX IF NOT EXISTS idx_assets_expense_id ON assets(expense_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_receipt_id ON expenses(receipt_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
 CREATE INDEX IF NOT EXISTS idx_accountant_org_links_accountant ON accountant_org_links(accountant_org_id);
@@ -202,12 +223,19 @@ const DEMO_CLIENTS = [
     fname: 'Aoife',
     sname: 'Byrne',
     ownerUserId: ACCT_USER_ID, // owned by the admin accountant
+    vatStatus: 'flat_rate_farmer',
     tx: [
       { title: 'Livery income', category: 'income', amount: 1200, at: d(0, 14) },
       { title: 'Lessons income', category: 'income', amount: 640, at: d(1, 9) },
-      { title: 'Feed & bedding', category: 'equipment', amount: 540, at: d(0, 18) },
-      { title: 'Vet visit', category: 'professional', amount: 180, at: d(2, 9) },
-      { title: 'Diesel', category: 'travel', amount: 95.4, at: d(3, 11) },
+      { title: 'Feed & bedding', category: 'feed_bedding', amount: 540, at: d(0, 18) },
+      { title: 'Vet visit', category: 'vet_fees', amount: 180, at: d(2, 9) },
+      { title: 'Diesel', category: 'fuel', amount: 95.4, at: d(3, 11) },
+      // Capital item: lands in the asset register, claimed via wear & tear
+      // (12.5%/yr over 8 years) instead of as a revenue expense.
+      {
+        title: 'Ifor Williams horsebox', category: 'tack_equipment', amount: 8400, at: d(1, 2),
+        capital: { description: 'Ifor Williams HB511 horsebox', asset_type: 'plant_machinery' },
+      },
     ],
   },
   {
@@ -219,6 +247,7 @@ const DEMO_CLIENTS = [
     fname: 'Sean',
     sname: 'Murphy',
     ownerUserId: ACCT2_USER_ID, // owned by the staff accountant
+    vatStatus: 'registered',
     tx: [
       { title: 'Shop sales', category: 'income', amount: 4100, at: d(1, 15) },
       { title: 'Stock purchase', category: 'equipment', amount: 2300, at: d(0, 7) },
@@ -242,19 +271,29 @@ async function main() {
     // sequentially — a single pg client can't execute concurrent queries.
     const insertTx = async (userId, txns) => {
       for (const tx of txns) {
-        await client.query(
+        const inserted = await client.query(
           `INSERT INTO expenses (user_id, title, description, category, amount, currency, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,'EUR',$6,$6)`,
+           VALUES ($1,$2,$3,$4,$5,'EUR',$6,$6) RETURNING id`,
           [userId, tx.title, '', tx.category, tx.amount, tx.at],
         );
+        // A `capital` marker also writes the linked asset-register row (the
+        // in-app flow does this transactionally on save).
+        if (tx.capital) {
+          await client.query(
+            `INSERT INTO assets (user_id, expense_id, description, category, asset_type, cost, currency, acquired_date)
+             VALUES ($1,$2,$3,$4,$5,$6,'EUR',$7)`,
+            [userId, inserted.rows[0].id, tx.capital.description, tx.category,
+              tx.capital.asset_type || 'plant_machinery', tx.amount, tx.at],
+          );
+        }
       }
     };
 
     const insertOrgWithOwner = async (o) => {
       await client.query(
-        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice)],
+        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice, vat_status)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice), o.vatStatus || 'not_registered'],
       );
       await client.query(
         `INSERT INTO users (
@@ -278,6 +317,7 @@ async function main() {
       'DELETE FROM accountant_org_links WHERE accountant_org_id = ANY($1) OR client_org_id = ANY($1)',
       [allOrgIds],
     );
+    await client.query('DELETE FROM assets WHERE user_id = ANY($1)', [allUserIds]);
     await client.query('DELETE FROM expenses WHERE user_id = ANY($1)', [allUserIds]);
     await client.query('UPDATE organisations SET owner_account_id = NULL WHERE id = ANY($1)', [allOrgIds]);
     await client.query('DELETE FROM users WHERE id = ANY($1) OR email = ANY($2)', [allUserIds, allEmails]);
@@ -312,6 +352,7 @@ async function main() {
       await insertOrgWithOwner({
         orgId: c.orgId, userId: c.userId, orgName: c.orgName, orgType: 'business',
         orgCategory: c.orgCategory, email: c.email, fname: c.fname, sname: c.sname, role: 'user', isPractice: false,
+        vatStatus: c.vatStatus,
       });
       await insertTx(c.userId, c.tx);
       await client.query(

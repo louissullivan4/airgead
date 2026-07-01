@@ -13,6 +13,7 @@ router.use(authenticateToken, scopeToOrg);
 
 router.get('/clients', accountantController.listClients);
 router.get('/clients/:clientOrgId/transactions', accountantController.getClientTransactions);
+router.get('/clients/:clientOrgId/tax-summary', accountantController.getClientTaxSummary);
 router.get('/clients/:clientOrgId/export', accountantController.exportClient);
 router.delete('/clients/:clientOrgId/link', accountantController.revokeClient);
 // Reassign a client to another accountant — firm admin (owner) only.

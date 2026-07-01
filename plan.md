@@ -75,6 +75,16 @@ Phase 3.1 — Accountancy firms (multiple accountants) [DONE]
 [DONE] Admin invites accountants (existing owner-only invite-member) + admin reassigns clients (PATCH /accountant/clients/:id/assign).
 [DONE] Frontend: signup firm checkbox, Clients admin "Accountant" column + Reassign, Team tab firm copy. Seed adds a staff accountant + split ownership.
 
+Phase 5 — Irish tax engine (the Hill 3 moat) [DONE — see docs/phase-5-tax-engine.md]
+[DONE] Capital allowances / wear & tear engine — 12.5% straight-line over 8 years, €24k passenger-car cap, disposal cutoff; computed on demand, never stored (services/tax/wearAndTear.js).
+[DONE] Asset register (migration 009 assets table) — an expense is capital iff an assets row references it; capture-form "Capital item" toggle writes expense+asset in ONE transaction; PATCH is_capital tri-state; standalone opening assets via /assets CRUD.
+[DONE] VAT treatment — organisations.vat_status (registered / not / flat-rate farmer), per-year flat-rate addition table, VAT 58 reclaim prompt from vat58-flagged categories (services/tax/vat.js).
+[DONE] Form 11 pre-sort — revenue expenses bucketised into the real "extracts from accounts" lines, capital-linked expenses excluded (services/tax/form11.js).
+[DONE] Tax summary — GET /reports/tax-summary (own org) + GET /accountant/clients/:id/tax-summary (link-gated); one shape powers the trader page, the client tab, and the export sheets.
+[DONE] Export pack — accountant zip/Excel gains Tax summary + Capital allowances + VAT sheets and a Capital column (Excel + CSV).
+[DONE] Frontend — /reports Tax summary page (schedule + asset register management), client-detail Tax summary tab, Clients readiness badges ("nothing to chase"), Settings VAT status, capital chip in the transactions table.
+[TODO] Balancing allowances/charges on disposal; CO₂-banded car cap; flat-rate % check each Budget.
+
 Phase 4 — Super-admin platform dashboard [DONE — see docs/phase-4-super-admin.md]
 [DONE] /admin/* surface (requirePlatformRole) — platform overview (all orgs/users/firms + totals), all-orgs + all-users listings.
 [DONE] Type-selectable invite (regular user vs accountant→firm) via platform invite token.

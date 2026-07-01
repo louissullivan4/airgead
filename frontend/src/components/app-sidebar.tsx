@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, House, LifeBuoy, Receipt, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import { Briefcase, Calculator, House, LifeBuoy, Receipt, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { UserMenu } from "./user-menu";
@@ -17,15 +17,18 @@ interface AppSidebarProps {
   showTeam?: boolean;
   /** Platform super_admin: show the Admin dashboard. */
   showAdmin?: boolean;
+  /** Business orgs: show the Tax summary (Form 11 / capital allowances / VAT). */
+  showReports?: boolean;
 }
 
-function AppSidebar({ name, email, onSupport, showClients, showTeam, showAdmin }: AppSidebarProps) {
+function AppSidebar({ name, email, onSupport, showClients, showTeam, showAdmin, showReports }: AppSidebarProps) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const nav = [
     { label: "Home", href: "/home", icon: House },
     { label: "Transactions", href: "/transactions", icon: Receipt },
+    ...(showReports ? [{ label: "Tax summary", href: "/reports", icon: Calculator }] : []),
     ...(showClients ? [{ label: "Clients", href: "/clients", icon: Briefcase }] : []),
     ...(showTeam ? [{ label: "Team", href: "/team", icon: UsersRound }] : []),
     ...(showAdmin ? [{ label: "Admin", href: "/admin", icon: ShieldCheck }] : []),

@@ -5,9 +5,17 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Download, Receipt, Search } from "lucide-react";
 import { toast } from "sonner";
-import { api, amountOf, isIncome, type Expense } from "@/lib/api";
+import { api, amountOf, isIncome, type Expense, type TaxSummary } from "@/lib/api";
 import { TransactionsTable, type SortKey } from "@/components/transactions-table";
 import { TransactionList } from "@/components/transaction-list";
+import { TaxSummaryView } from "@/components/tax-summary-view";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +27,10 @@ import { Pagination } from "@/components/ui/pagination";
 
 const TYPE_FILTERS = ["All", "Expenses", "Income"] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
+const VIEWS = ["Transactions", "Tax summary"] as const;
+type View = (typeof VIEWS)[number];
 const TAX_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 9 }, (_, i) => TAX_YEAR - i);
 
 export default function ClientDetailPage() {
   const params = useParams<{ clientOrgId: string }>();
@@ -30,6 +41,13 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  // The client's tax picture (Form 11 / capital allowances / VAT), per year.
+  const [view, setView] = useState<View>("Transactions");
+  const [taxYear, setTaxYear] = useState(TAX_YEAR);
+  const [taxSummary, setTaxSummary] = useState<TaxSummary | null>(null);
+  const [taxLoading, setTaxLoading] = useState(false);
+  const [taxError, setTaxError] = useState<string | null>(null);
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
   const [search, setSearch] = useState("");
@@ -65,6 +83,25 @@ export default function ClientDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Fetch the tax summary lazily — only once the tab is opened (or year changes).
+  useEffect(() => {
+    if (view !== "Tax summary") return;
+    let active = true;
+    setTaxLoading(true);
+    api.accountant
+      .getClientTaxSummary(clientOrgId, taxYear)
+      .then((s) => {
+        if (!active) return;
+        setTaxSummary(s);
+        setTaxError(null);
+      })
+      .catch((err) => active && setTaxError(err instanceof Error ? err.message : "Failed to load tax summary"))
+      .finally(() => active && setTaxLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [view, clientOrgId, taxYear]);
 
   // Client books may be multi-currency; show the most common one in the column.
   const currency = useMemo(() => {
@@ -167,63 +204,105 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search transactions"
-            className="pl-9"
-          />
-        </div>
-        <Segmented
-          value={typeFilter}
-          onValueChange={setTypeFilter}
-          aria-label="Filter by type"
-          options={TYPE_FILTERS.map((t) => ({ label: t, value: t }))}
-        />
-      </div>
+      <Segmented
+        value={view}
+        onValueChange={setView}
+        aria-label="Client view"
+        options={VIEWS.map((v) => ({ label: v, value: v }))}
+      />
 
-      {loading ? (
-        <Card className="space-y-3 p-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-lg" />
-          ))}
-        </Card>
-      ) : error ? (
-        <Card className="p-10 text-center text-sm text-destructive">{error}</Card>
-      ) : total === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title={filtering ? "No matching transactions" : "No transactions yet"}
-          description={
-            filtering ? "Try clearing your search or filter." : "This client hasn't recorded anything yet."
-          }
-        />
+      {view === "Tax summary" ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-end">
+            <Select value={String(taxYear)} onValueChange={(v) => setTaxYear(Number(v))}>
+              <SelectTrigger aria-label="Tax year" className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {taxLoading ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-28 rounded-xl" />
+                ))}
+              </div>
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          ) : taxError ? (
+            <Card className="p-10 text-center text-sm text-destructive">{taxError}</Card>
+          ) : taxSummary ? (
+            <TaxSummaryView summary={taxSummary} />
+          ) : null}
+        </div>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="hidden lg:block">
-            <TransactionsTable
-              expenses={visible}
-              currency={currency}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onSort={onSort}
-              readOnly
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search transactions"
+                className="pl-9"
+              />
+            </div>
+            <Segmented
+              value={typeFilter}
+              onValueChange={setTypeFilter}
+              aria-label="Filter by type"
+              options={TYPE_FILTERS.map((t) => ({ label: t, value: t }))}
             />
           </div>
-          <div className="px-2 lg:hidden">
-            <TransactionList expenses={visible} currency={currency} />
-          </div>
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
-        </Card>
+
+          {loading ? (
+            <Card className="space-y-3 p-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-lg" />
+              ))}
+            </Card>
+          ) : error ? (
+            <Card className="p-10 text-center text-sm text-destructive">{error}</Card>
+          ) : total === 0 ? (
+            <EmptyState
+              icon={Receipt}
+              title={filtering ? "No matching transactions" : "No transactions yet"}
+              description={
+                filtering ? "Try clearing your search or filter." : "This client hasn't recorded anything yet."
+              }
+            />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="hidden lg:block">
+                <TransactionsTable
+                  expenses={visible}
+                  currency={currency}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  readOnly
+                />
+              </div>
+              <div className="px-2 lg:hidden">
+                <TransactionList expenses={visible} currency={currency} />
+              </div>
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

@@ -6,6 +6,8 @@ const organisationRoutes = require('./routes/organisationRoutes');
 const accountantRoutes = require('./routes/accountantRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const fileRoutes = require('./routes/fileRoutes');
+const assetRoutes = require('./routes/assetRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const path = require('path');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
@@ -41,6 +43,8 @@ app.use('/organisations', organisationRoutes);
 app.use('/accountant', accountantRoutes);
 app.use('/admin', adminRoutes);
 app.use('/files', fileRoutes);
+app.use('/assets', assetRoutes);
+app.use('/reports', reportRoutes);
 
 app.use((err, req, res, _next) => {
     logger.error('Unhandled error: ', err);

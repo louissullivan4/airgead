@@ -17,33 +17,87 @@ const orgPredicate = (alias, orgId, paramIndex) => {
     };
 };
 
+// Core INSERT. `q` is anything with .query() — the pool, or a client inside a
+// transaction (createExpensesWithAssets).
+const insertExpense = async (q, expense) => {
+    const { user_id, title, description, category, amount, currency, receipt_image_url,
+        receipt_id, merchant_name, tax_amount, created_at } = expense;
+    // created_at doubles as the transaction date (it drives display, sorting
+    // and the tax-year report). COALESCE lets callers set it explicitly while
+    // falling back to now() when omitted.
+    const result = await q.query(
+        `INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url, receipt_id, merchant_name, tax_amount, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11::timestamptz, now())) RETURNING *`,
+        [user_id, title, description, category, amount, currency, receipt_image_url,
+            receipt_id || null, merchant_name || null, tax_amount ?? null, created_at || null]
+    );
+    return result.rows[0];
+};
+
 const createExpense = async (pool, expense) => {
     try {
-        const { user_id, title, description, category, amount, currency, receipt_image_url,
-            receipt_id, merchant_name, tax_amount, created_at } = expense;
-        // created_at doubles as the transaction date (it drives display, sorting
-        // and the tax-year report). COALESCE lets callers set it explicitly while
-        // falling back to now() when omitted.
-        const result = await pool.query(
-            `INSERT INTO expenses (user_id, title, description, category, amount, currency, receipt_image_url, receipt_id, merchant_name, tax_amount, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11::timestamptz, now())) RETURNING *`,
-            [user_id, title, description, category, amount, currency, receipt_image_url,
-                receipt_id || null, merchant_name || null, tax_amount ?? null, created_at || null]
-        );
-        logger.info('Expense created successfully', { user_id, title });
-        return result.rows[0];
+        const row = await insertExpense(pool, expense);
+        logger.info('Expense created successfully', { user_id: expense.user_id, title: expense.title });
+        return row;
     } catch (error) {
         logger.error('Error creating expense', { user_id: expense.user_id, error: error });
         throw error;
     }
 };
 
+// Phase 5: create one or more expenses, each optionally with a linked
+// asset-register row, in a SINGLE transaction — a multi-line receipt save (and
+// the single capital-expense save) is all-or-nothing. `items` is
+// [{ expense, asset: { description?, asset_type?, acquired_date? } | null }];
+// the asset's cost/category/currency follow the expense line.
+const createExpensesWithAssets = async (pool, items) => {
+    // Lazy require avoids import-order coupling for a helper only this fn uses.
+    const assetModel = require('./assetModel');
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const created = [];
+        for (const { expense, asset } of items) {
+            const row = await insertExpense(client, expense);
+            if (asset) {
+                await assetModel.createAsset(client, {
+                    user_id: row.user_id,
+                    expense_id: row.id,
+                    description: asset.description || row.title || row.merchant_name || 'Asset',
+                    category: row.category,
+                    asset_type: asset.asset_type,
+                    cost: row.amount,
+                    currency: row.currency,
+                    acquired_date: asset.acquired_date || row.created_at || null,
+                });
+            }
+            created.push(row);
+        }
+        await client.query('COMMIT');
+        logger.info('Created %d expense(s) with %d asset(s)', created.length,
+            items.filter((i) => i.asset).length);
+        return created;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        logger.error('Error creating expenses with assets', { error: error.message });
+        throw error;
+    } finally {
+        client.release();
+    }
+};
+
+// Phase 5: reads expose `is_capital` — true when an asset-register row is
+// linked to the expense (that row's existence IS the capital marker; there is
+// no flag column). EXISTS avoids join-duplication risk.
+const IS_CAPITAL_SELECT =
+    'SELECT expenses.*, EXISTS(SELECT 1 FROM assets a WHERE a.expense_id = expenses.id) AS is_capital FROM expenses';
+
 const getExpensesByUserIdNoIncome = async (pool, user_id, orgId) => {
     try {
         const org = orgPredicate('', orgId, 2);
         const values = org.usesParam ? [user_id, orgId] : [user_id];
         const result = await pool.query(
-            `SELECT * FROM expenses WHERE user_id = $1 AND category != 'income'${org.sql} ORDER BY updated_at DESC`,
+            `${IS_CAPITAL_SELECT} WHERE user_id = $1 AND category != 'income'${org.sql} ORDER BY updated_at DESC`,
             values
         );
         logger.info('Fetched expenses for user', { user_id });
@@ -59,7 +113,7 @@ const getExpensesByUserId = async (pool, user_id, orgId) => {
         const org = orgPredicate('', orgId, 2);
         const values = org.usesParam ? [user_id, orgId] : [user_id];
         const result = await pool.query(
-            `SELECT * FROM expenses WHERE user_id = $1${org.sql} ORDER BY updated_at DESC`,
+            `${IS_CAPITAL_SELECT} WHERE user_id = $1${org.sql} ORDER BY updated_at DESC`,
             values
         );
         logger.info('Fetched expenses for user', { user_id });
@@ -130,7 +184,7 @@ const getExpensesByReceiptId = async (pool, receiptId, orgId) => {
 const getExpensesByOrgId = async (pool, orgId) => {
     try {
         const result = await pool.query(
-            `SELECT * FROM expenses
+            `${IS_CAPITAL_SELECT}
              WHERE user_id IN (SELECT id FROM users WHERE org_id = $1)
              ORDER BY updated_at DESC`,
             [orgId]
@@ -148,7 +202,7 @@ const getExpensesByOrgIdAndYear = async (pool, orgId, year) => {
         const startDate = `${year}-01-01`;
         const endDate = `${parseInt(year, 10) + 1}-01-01`;
         const result = await pool.query(
-            `SELECT * FROM expenses
+            `${IS_CAPITAL_SELECT}
              WHERE user_id IN (SELECT id FROM users WHERE org_id = $1)
                AND created_at >= $2 AND created_at < $3
              ORDER BY updated_at DESC`,
@@ -169,8 +223,7 @@ const getExpensesByUserIdAndYear = async (pool, user_id, year, orgId) => {
 
         const org = orgPredicate('', orgId, 4);
         const query = `
-            SELECT *
-            FROM expenses
+            ${IS_CAPITAL_SELECT}
             WHERE user_id = $1
               AND created_at >= $2
               AND created_at < $3${org.sql}
@@ -265,6 +318,7 @@ const deleteExpense = async (pool, id, orgId) => {
 
 module.exports = {
     createExpense,
+    createExpensesWithAssets,
     getExpensesByUserId,
     getExpenseByCategory,
     getExpenseById,
