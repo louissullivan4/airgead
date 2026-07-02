@@ -120,7 +120,7 @@ function TransactionsTable({
               <td className="px-3 py-3 text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button vaairgeadt="ghost" size="icon-sm" aria-label="Row actions">
+                    <Button variant="ghost" size="icon-sm" aria-label="Row actions">
                       <MoreHorizontal />
                     </Button>
                   </DropdownMenuTrigger>
@@ -129,7 +129,7 @@ function TransactionsTable({
                       <Pencil />
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem vaairgeadt="destructive" onSelect={() => onDelete?.(e)}>
+                    <DropdownMenuItem variant="destructive" onSelect={() => onDelete?.(e)}>
                       <Trash2 />
                       Delete
                     </DropdownMenuItem>

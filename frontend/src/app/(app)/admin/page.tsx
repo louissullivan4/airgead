@@ -206,7 +206,7 @@ export default function AdminPage() {
                     <td className="px-3 py-3 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button vaairgeadt="ghost" size="icon-sm" aria-label="Org actions">
+                          <Button variant="ghost" size="icon-sm" aria-label="Org actions">
                             <MoreHorizontal />
                           </Button>
                         </DropdownMenuTrigger>
@@ -228,7 +228,7 @@ export default function AdminPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                vaairgeadt="destructive"
+                                variant="destructive"
                                 onSelect={() =>
                                   setConfirm({
                                     title: `Delete ${o.name}?`,
@@ -297,7 +297,7 @@ export default function AdminPage() {
                       {!isSelf && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button vaairgeadt="ghost" size="icon-sm" aria-label="User actions">
+                            <Button variant="ghost" size="icon-sm" aria-label="User actions">
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
@@ -325,7 +325,7 @@ export default function AdminPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              vaairgeadt="destructive"
+                              variant="destructive"
                               onSelect={() =>
                                 setConfirm({
                                   title: `Delete ${u.fname} ${u.sname}?`.trim(),
@@ -368,7 +368,7 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction vaairgeadt="destructive" disabled={working} onClick={runConfirm}>
+            <AlertDialogAction variant="destructive" disabled={working} onClick={runConfirm}>
               Delete permanently
             </AlertDialogAction>
           </AlertDialogFooter>

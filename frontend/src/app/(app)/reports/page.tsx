@@ -141,7 +141,7 @@ export default function ReportsPage() {
               </div>
               <Button
                 size="sm"
-                vaairgeadt="outline"
+                variant="outline"
                 onClick={() => {
                   setEditingAsset(null);
                   setAssetDialogOpen(true);
@@ -169,11 +169,11 @@ export default function ReportsPage() {
                             {ASSET_TYPE_LABELS[a.asset_type] ?? a.asset_type}
                             <span>· acquired {new Date(a.acquired_date).toLocaleDateString()}</span>
                             {a.expense_id ? (
-                              <Badge vaairgeadt="secondary">From transaction</Badge>
+                              <Badge variant="secondary">From transaction</Badge>
                             ) : (
-                              <Badge vaairgeadt="secondary">Opening asset</Badge>
+                              <Badge variant="secondary">Opening asset</Badge>
                             )}
-                            {a.disposal_date && <Badge vaairgeadt="secondary">Disposed</Badge>}
+                            {a.disposal_date && <Badge variant="secondary">Disposed</Badge>}
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums">
@@ -182,7 +182,7 @@ export default function ReportsPage() {
                         <td className="w-10 py-2.5 text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button vaairgeadt="ghost" size="icon-sm" aria-label={`Actions for ${a.description}`}>
+                              <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${a.description}`}>
                                 <MoreHorizontal />
                               </Button>
                             </DropdownMenuTrigger>
@@ -195,7 +195,7 @@ export default function ReportsPage() {
                               >
                                 Edit / dispose
                               </DropdownMenuItem>
-                              <DropdownMenuItem vaairgeadt="destructive" onSelect={() => setRemovingAsset(a)}>
+                              <DropdownMenuItem variant="destructive" onSelect={() => setRemovingAsset(a)}>
                                 Remove from register
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -230,7 +230,7 @@ export default function ReportsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction vaairgeadt="destructive" onClick={confirmRemove}>
+            <AlertDialogAction variant="destructive" onClick={confirmRemove}>
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>

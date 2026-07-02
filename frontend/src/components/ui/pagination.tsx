@@ -55,7 +55,7 @@ function Pagination({
         </span>
         <div className="flex items-center gap-1">
           <Button
-            vaairgeadt="outline"
+            variant="outline"
             size="icon-sm"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
@@ -64,7 +64,7 @@ function Pagination({
             <ChevronLeft />
           </Button>
           <Button
-            vaairgeadt="outline"
+            variant="outline"
             size="icon-sm"
             disabled={page >= pageCount}
             onClick={() => onPageChange(page + 1)}

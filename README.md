@@ -1,4 +1,4 @@
-# rian
+# airgead
 
 Expense tracking and ledger management.
 
@@ -7,7 +7,7 @@ Expense tracking and ledger management.
 ## Structure
 
 ```
-rian/
+airgead/
 ├── backend/        Express + PostgreSQL API
 ├── frontend/       Next.js web app
 ├── db/             Database scripts

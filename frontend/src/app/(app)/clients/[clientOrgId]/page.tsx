@@ -191,11 +191,11 @@ export default function ClientDetailPage() {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button vaairgeadt="outline" size="sm" onClick={handleExport} disabled={exporting}>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
             {exporting ? <Spinner /> : <Download />}
             {exporting ? "Exporting…" : "Export"}
           </Button>
-          <Button asChild vaairgeadt="ghost" size="sm">
+          <Button asChild variant="ghost" size="sm">
             <Link href="/clients">
               <ArrowLeft />
               Back to clients

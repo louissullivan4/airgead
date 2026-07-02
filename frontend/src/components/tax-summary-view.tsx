@@ -128,8 +128,8 @@ function TaxSummaryView({ summary }: { summary: TaxSummary }) {
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                           {ASSET_TYPE_LABELS[row.assetType] ?? row.assetType}
                           <span>· acquired {new Date(row.acquiredDate).toLocaleDateString()}</span>
-                          {row.capped && <Badge vaairgeadt="secondary">€24k car cap</Badge>}
-                          {row.disposed && <Badge vaairgeadt="secondary">Disposed</Badge>}
+                          {row.capped && <Badge variant="secondary">€24k car cap</Badge>}
+                          {row.disposed && <Badge variant="secondary">Disposed</Badge>}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">

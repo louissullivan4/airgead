@@ -378,7 +378,7 @@ export default function SettingsPage() {
             .
           </p>
           <Button
-            vaairgeadt="outline"
+            variant="outline"
             onClick={handleLogout}
             className="text-destructive hover:bg-destructive/10"
           >

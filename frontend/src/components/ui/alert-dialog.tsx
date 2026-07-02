@@ -69,12 +69,12 @@ AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayNam
 const AlertDialogAction = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Action>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> & {
-    vaairgeadt?: "primary" | "destructive";
+    variant?: "primary" | "destructive";
   }
->(({ className, vaairgeadt = "primary", ...props }, ref) => (
+>(({ className, variant = "primary", ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={cn(buttonVaairgeadts({ vaairgeadt }), className)}
+    className={cn(buttonVaairgeadts({ variant }), className)}
     {...props}
   />
 ));
@@ -86,7 +86,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(buttonVaairgeadts({ vaairgeadt: "outline" }), className)}
+    className={cn(buttonVaairgeadts({ variant: "outline" }), className)}
     {...props}
   />
 ));

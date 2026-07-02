@@ -128,7 +128,7 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-3">
-          <Badge vaairgeadt="secondary">Early access</Badge>
+          <Badge variant="secondary">Early access</Badge>
           <span className="text-sm text-muted-foreground">Everything included, no card required.</span>
         </CardContent>
       </Card>
@@ -157,7 +157,7 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge vaairgeadt={d.tone === "destructive" ? "destructive" : "default"}>{d.badge}</Badge>
+          <Badge variant={d.tone === "destructive" ? "destructive" : "default"}>{d.badge}</Badge>
           <span className="text-sm text-muted-foreground">{d.line}</span>
         </div>
         {status.isPractice && status.seatCount !== undefined && (
@@ -177,7 +177,7 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
               </Button>
             )}
             {showManage && (
-              <Button vaairgeadt="outline" onClick={() => go("portal")} disabled={redirecting}>
+              <Button variant="outline" onClick={() => go("portal")} disabled={redirecting}>
                 {redirecting ? <Spinner /> : <ExternalLink />}
                 Manage billing
               </Button>

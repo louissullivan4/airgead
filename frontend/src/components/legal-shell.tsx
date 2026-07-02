@@ -23,7 +23,7 @@ function LegalShell({
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5">
           <Logo href="/" />
           <div className="flex items-center gap-2">
-            <Button asChild vaairgeadt="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm">
               <Link href="/login">Log in</Link>
             </Button>
             <Button asChild size="sm">

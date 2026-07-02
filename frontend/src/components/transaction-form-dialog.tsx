@@ -455,7 +455,7 @@ function TransactionFormDialog({
                     {lines.length > 1 && (
                       <Button
                         type="button"
-                        vaairgeadt="ghost"
+                        variant="ghost"
                         size="icon-sm"
                         onClick={() => removeLine(l.key)}
                         aria-label={`Remove line item ${i + 1}`}
@@ -508,7 +508,7 @@ function TransactionFormDialog({
               ))}
             </div>
 
-            <Button type="button" vaairgeadt="outline" size="sm" onClick={addLine}>
+            <Button type="button" variant="outline" size="sm" onClick={addLine}>
               <Plus />
               Add line item
             </Button>
@@ -613,7 +613,7 @@ function TransactionFormDialog({
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button vaairgeadt="outline">Cancel</Button>
+            <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={receiptMode ? saveReceiptLines : saveSingle} disabled={saving}>
             {saving && <Spinner />}

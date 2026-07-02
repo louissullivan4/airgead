@@ -102,7 +102,7 @@ function ReceiptCaptureDialog({
         )}
 
         <DialogFooter>
-          <Button vaairgeadt="outline" onClick={onSkip} disabled={processing}>
+          <Button variant="outline" onClick={onSkip} disabled={processing}>
             <FileText />
             Skip photo
           </Button>
