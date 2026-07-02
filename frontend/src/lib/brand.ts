@@ -1,6 +1,6 @@
 // Single source of truth for the product name on the frontend.
 // Mirror of backend/src/config/brand.js. Reference BRAND instead of hardcoding.
-export const BRAND = "rian";
+export const BRAND = "airgead";
 export const BRAND_LEGACY = "EquiLedger";
 
 // Brand primary colour (purple-60, AA-tested). Mirrors the --primary token in

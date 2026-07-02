@@ -7,7 +7,7 @@ export const TOKEN_COOKIE = "rian_token";
 export const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
 // Phase 2 OCR auto-fill feature flag. DORMANT by default: when false, the camera
-// capture flow goes straight to the manual form — no OCR auto-fill UI renders and
+// capture flow goes straight to the manual form - no OCR auto-fill UI renders and
 // no parsed data is used. Mirror of the backend OCR_PROVIDER/OCR_AUTOFILL_ENABLED
 // switches. Inlined at build time (NEXT_PUBLIC_*), safe in client + edge runtimes.
 export const OCR_AUTOFILL_ENABLED =

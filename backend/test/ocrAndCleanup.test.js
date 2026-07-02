@@ -25,7 +25,7 @@ describe('receiptCleanup.cleanReceipt', () => {
         expect(ext).toBe('jpg');
         expect(cropped).toBe(false);
 
-        // Stored image is a legible (not binarised) JPEG — decompresses for the
+        // Stored image is a legible (not binarised) JPEG - decompresses for the
         // user automatically on view/download.
         const meta = await sharp(imageBuffer).metadata();
         expect(meta.format).toBe('jpeg');

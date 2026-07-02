@@ -19,7 +19,7 @@ const VAT_STATUS_LABELS: Record<string, string> = {
 
 /**
  * The year's full tax picture: Form 11-shaped expense buckets, the capital
- * allowances schedule, and the VAT position. Pure display — fed by
+ * allowances schedule, and the VAT position. Pure display - fed by
  * /reports/tax-summary (own org) or the accountant's client twin.
  */
 function TaxSummaryView({ summary }: { summary: TaxSummary }) {
@@ -57,10 +57,10 @@ function TaxSummaryView({ summary }: { summary: TaxSummary }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Form 11 — extracts from accounts</CardTitle>
+          <CardTitle>Form 11 - extracts from accounts</CardTitle>
           <CardDescription>
             The year&apos;s revenue expenses, pre-sorted into the boxes the return asks for.
-            Capital items are excluded here — they&apos;re claimed below instead.
+            Capital items are excluded here - they&apos;re claimed below instead.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,7 +94,7 @@ function TaxSummaryView({ summary }: { summary: TaxSummary }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Capital allowances — wear &amp; tear schedule</CardTitle>
+          <CardTitle>Capital allowances - wear &amp; tear schedule</CardTitle>
           <CardDescription>
             Plant, machinery &amp; vehicles written off at 12.5% a year over 8 years.
             {totals.capitalExpenditure > 0 &&
@@ -104,8 +104,8 @@ function TaxSummaryView({ summary }: { summary: TaxSummary }) {
         <CardContent>
           {capitalAllowances.rows.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              No assets in the register for {summary.year}. Mark an expense as a capital item —
-              or add an opening asset — and its allowance appears here.
+              No assets in the register for {summary.year}. Mark an expense as a capital item -
+              or add an opening asset - and its allowance appears here.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -200,7 +200,7 @@ function TaxSummaryView({ summary }: { summary: TaxSummary }) {
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 {formatCurrency(vat.vat58EligibleSpend)} spent on farm buildings / fencing /
                 drainage this year may qualify for a VAT&nbsp;58 reclaim even without VAT
-                registration — worth raising with the accountant.
+                registration - worth raising with the accountant.
               </p>
             )}
           </dl>

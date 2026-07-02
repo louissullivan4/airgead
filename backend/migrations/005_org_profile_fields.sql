@@ -4,7 +4,7 @@
 -- describe their business and have it classified by a granular `org_category`
 -- slug. That slug drives the per-type category template seeded into the new
 -- `categories` jsonb column (owner-editable thereafter). This migration is
--- ADDITIVE, idempotent, and reversible. It does NOT touch `expenses` — category
+-- ADDITIVE, idempotent, and reversible. It does NOT touch `expenses` - category
 -- stays free text (see categoryTemplates.js / organisationModel.js).
 --
 -- The existing `type` column (personal/business) is kept as-is; `org_category`

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Task 6 — one-time, MANUAL bucket lockdown.
+ * Task 6 - one-time, MANUAL bucket lockdown.
  *
  * After migration 004_receipt_path rewrites DB values to object paths and the
  * app starts serving receipts via signed URLs, existing objects in the bucket

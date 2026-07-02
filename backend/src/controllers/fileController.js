@@ -13,7 +13,7 @@ const CONTENT_TYPES = {
     '.pdf': 'application/pdf',
 };
 
-// Serve a receipt referenced by a short-lived signed token — the local storage
+// Serve a receipt referenced by a short-lived signed token - the local storage
 // driver's counterpart to a GCS signed URL. The token (minted in
 // storage.getSignedUrl) carries the object key and an expiry; we verify it and
 // stream the bytes. The token IS the authorisation, so no JWT auth middleware

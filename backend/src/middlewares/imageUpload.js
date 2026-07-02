@@ -44,13 +44,13 @@ const uploadBase64Image = async (req, res, next) => {
             const year = new Date().getFullYear();
             objectPath = `org_${orgId}/${year}/${receiptId}.${imageType}`;
         } else {
-            logger.warn('Uploading receipt without orgId — using legacy "ids/" prefix.');
+            logger.warn('Uploading receipt without orgId - using legacy "ids/" prefix.');
             objectPath = `ids/${receiptId}.${imageType}`;
         }
 
         await storage.putObject(objectPath, imageBuffer, matches[1]);
 
-        // Store the object path — not a public URL. Objects are private; reads
+        // Store the object path - not a public URL. Objects are private; reads
         // go through short-lived signed URLs (see signedUrl.js / storage.js).
         req.body.image = objectPath;
         next();

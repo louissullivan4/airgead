@@ -154,7 +154,7 @@ const setOrgStatus = async (req, res) => {
     }
 };
 
-// DELETE /admin/users/:id — GDPR erasure of an individual.
+// DELETE /admin/users/:id - GDPR erasure of an individual.
 // A user who solely owns their org → the whole org is erased; a user owning an
 // org that still has other members → 409 (delete the org or transfer first).
 const deleteUser = async (req, res) => {
@@ -188,7 +188,7 @@ const deleteUser = async (req, res) => {
     }
 };
 
-// DELETE /admin/orgs/:id — GDPR erasure / account closure of an entire org.
+// DELETE /admin/orgs/:id - GDPR erasure / account closure of an entire org.
 const deleteOrg = async (req, res) => {
     const { id } = req.params;
     if (id === req.user.orgId) {

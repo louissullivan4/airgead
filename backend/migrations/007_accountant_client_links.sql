@@ -11,7 +11,7 @@
 --
 -- `organisations.is_accountant_practice` flags practice orgs that may send
 -- client invites. It defaults false and (this phase) is flipped manually in the
--- DB — there is no self-serve enablement (it becomes a paid capability later).
+-- DB - there is no self-serve enablement (it becomes a paid capability later).
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- provides gen_random_uuid()
 

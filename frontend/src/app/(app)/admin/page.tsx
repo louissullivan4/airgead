@@ -280,7 +280,7 @@ export default function AdminPage() {
                       {isSelf && <span className="ml-1 text-xs text-muted-foreground">(you)</span>}
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">{u.email}</td>
-                    <td className="px-3 py-3 text-muted-foreground">{u.org_name ?? "—"}</td>
+                    <td className="px-3 py-3 text-muted-foreground">{u.org_name ?? "-"}</td>
                     <td className="px-3 py-3">
                       {isSuper ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">

@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
 
 export const metadata: Metadata = {
-  title: { absolute: `${BRAND} — expense & receipt tracking for freelancers` },
+  title: { absolute: `${BRAND} - expense & receipt tracking for freelancers` },
 };
 
 const FEATURES = [
   {
     icon: Camera,
     title: "Snap & store receipts",
-    body: "Photograph a receipt and rian attaches it to the expense — stored safely and exportable anytime.",
+    body: "Photograph a receipt and rian attaches it to the expense - stored safely and exportable anytime.",
   },
   {
     icon: Sparkles,
@@ -51,6 +51,9 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
               <Link href="/signup">For accountants</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link href="/pricing">Pricing</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href="/login">Log in</Link>
@@ -155,7 +158,7 @@ export default function LandingPage() {
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-semibold tracking-tight">Simple pricing</h2>
               <p className="mt-3 text-muted-foreground">
-                {BRAND} is free while we&apos;re getting started — no card, no catch.
+                {BRAND} is free while we&apos;re getting started - no card, no catch.
               </p>
             </div>
             <div className="mx-auto mt-12 max-w-md">
@@ -178,6 +181,12 @@ export default function LandingPage() {
                   <Link href="/signup">Get started</Link>
                 </Button>
               </div>
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                Wondering what it will cost later?{" "}
+                <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2 hover:no-underline">
+                  See pricing
+                </Link>
+              </p>
             </div>
           </div>
         </section>
@@ -216,14 +225,23 @@ export default function LandingPage() {
             © {new Date().getFullYear()} {BRAND}. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link href="/pricing" className="hover:text-foreground">
+              Pricing
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
             <Link href="/login" className="hover:text-foreground">
               Log in
             </Link>
-            <Link href="/signup" className="hover:text-foreground">
-              Sign up
-            </Link>
           </div>
         </div>
+        <p className="mx-auto mt-4 w-full max-w-6xl px-5 text-center text-xs text-muted-foreground sm:text-left">
+          Essential cookies only - no tracking.
+        </p>
       </footer>
     </div>
   );

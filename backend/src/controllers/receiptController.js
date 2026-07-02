@@ -24,7 +24,7 @@ const decodeDataUri = (dataUri) => {
 
 // POST /receipts/process
 // Accepts the raw captured image, cleans it (crop[deferred] -> binarise),
-// optionally runs OCR (DORMANT — only if OCR_PROVIDER !== 'none'), stores the
+// optionally runs OCR (DORMANT - only if OCR_PROVIDER !== 'none'), stores the
 // binarised PNG privately, creates a receipts row, and returns { receiptId,
 // signedUrl, parsedData, ocrConfidence }. With OCR disabled this is just
 // clean + store + return.
@@ -50,7 +50,7 @@ const processReceipt = async (req, res) => {
         const objectPath = `org_${orgId}/${year}/${receiptId}.${ext}`;
         await storage.putObject(objectPath, imageBuffer, contentType);
 
-        // OCR branch — DORMANT. getOcrProvider() returns null while
+        // OCR branch - DORMANT. getOcrProvider() returns null while
         // OCR_PROVIDER=none, so nothing here runs today. Flipping the env var
         // later activates auto-fill with no code change: the receipt is created
         // 'pending' (awaiting user confirmation) and carries the parsed data.
@@ -128,7 +128,7 @@ const createReceiptExpenses = async (req, res) => {
         }
 
         // All lines (and any capital asset-register rows they carry) are written
-        // in ONE transaction — a multi-line save is all-or-nothing.
+        // in ONE transaction - a multi-line save is all-or-nothing.
         const ASSET_TYPES = ['plant_machinery', 'motor_vehicle'];
         const created = await expenseModel.createExpensesWithAssets(
             req.pool,
@@ -163,7 +163,7 @@ const createReceiptExpenses = async (req, res) => {
     }
 };
 
-// GET /receipts/:id/image-url — fresh short-lived signed URL for the receipt image.
+// GET /receipts/:id/image-url - fresh short-lived signed URL for the receipt image.
 const getReceiptImageUrl = async (req, res) => {
     try {
         const { id } = req.params;
@@ -182,7 +182,7 @@ const getReceiptImageUrl = async (req, res) => {
     }
 };
 
-// GET /receipts/:id — receipt plus its linked expense line items.
+// GET /receipts/:id - receipt plus its linked expense line items.
 const getReceipt = async (req, res) => {
     try {
         const { id } = req.params;

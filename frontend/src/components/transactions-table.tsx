@@ -96,7 +96,7 @@ function TransactionsTable({
               {e.is_capital && (
                 <span
                   className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border"
-                  title="Capital item — claimed via wear & tear over 8 years"
+                  title="Capital item - claimed via wear & tear over 8 years"
                 >
                   <Landmark className="size-3" />
                   Capital

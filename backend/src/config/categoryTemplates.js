@@ -8,14 +8,14 @@
 //   Template = { expense: Node[], income: Node[] }
 //
 // Phase 5 metadata flags (suggestions for the UI, never enforced server-side):
-//   capital — picking this category suggests "capital item" (asset register /
+//   capital - picking this category suggests "capital item" (asset register /
 //             wear & tear over 8 years) in the transaction form.
-//   vat58   — spend here counts toward the VAT 58 reclaim prompt for
+//   vat58   - spend here counts toward the VAT 58 reclaim prompt for
 //             unregistered / flat-rate farmers (farm buildings, fencing,
 //             drainage). See services/tax/vat.js.
 //
 // The leaf slug a user picks is what gets stored in `expenses.category` (free
-// text) — so slugs are stable identifiers; labels are display-only and editable.
+// text) - so slugs are stable identifiers; labels are display-only and editable.
 //
 // !!! ORG_CATEGORY_SLUGS MUST stay in sync with the CHECK constraint in
 // migrations/005_org_profile_fields.sql and ORG_CATEGORIES in
@@ -36,7 +36,7 @@ const ORG_CATEGORY_SLUGS = [
     'other',
 ];
 
-// Generic fallback — mirrors the historical hardcoded list so personal/other
+// Generic fallback - mirrors the historical hardcoded list so personal/other
 // orgs (and any org with no stored tree) still get a usable set on day one.
 const DEFAULT_TEMPLATE = {
     expense: [

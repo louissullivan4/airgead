@@ -1,7 +1,7 @@
 const logger = require('../utils/logger');
 
 // Phase 3 accountant ↔ client links. An accountancy practice org is granted
-// read+export access over a CLIENT's separate org via a row here — it never
+// read+export access over a CLIENT's separate org via a row here - it never
 // joins the client org. Access is gated everywhere on an *active* link.
 
 // The single active link between a practice and one client org, or null.

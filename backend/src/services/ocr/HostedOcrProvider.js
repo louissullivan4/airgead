@@ -1,11 +1,11 @@
 const OcrProvider = require('./OcrProvider');
 
-// HostedOcrProvider — inert stub for the future hosted-OCR integration. It is
+// HostedOcrProvider - inert stub for the future hosted-OCR integration. It is
 // wired into the factory (OCR_PROVIDER=hosted) but throws until implemented, so
 // the integration point is obvious without committing to a vendor or shipping a
 // dependency we don't yet use.
 //
-// Candidate vendors (EU data residency is a hard requirement — receipts contain
+// Candidate vendors (EU data residency is a hard requirement - receipts contain
 // personal/tax data):
 //   - Veryfi
 //   - Tabscanner

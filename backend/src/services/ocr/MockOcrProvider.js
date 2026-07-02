@@ -1,9 +1,9 @@
 const OcrProvider = require('./OcrProvider');
 
-// MockOcrProvider — the only OCR implementation built in Phase 2. It returns
+// MockOcrProvider - the only OCR implementation built in Phase 2. It returns
 // canned-but-plausible data with fake confidence scores so the auto-fill seam
 // (and its dormant frontend UI) can be developed and tested end-to-end WITHOUT
-// calling — or paying for — any real OCR provider.
+// calling - or paying for - any real OCR provider.
 //
 // It is never reached by the live flow while OCR_PROVIDER=none. Flip the env to
 // 'mock' to exercise the dormant auto-fill path locally.
@@ -21,7 +21,7 @@ class MockOcrProvider extends OcrProvider {
                 { description: 'Flat white', amount: 3.60, category: 'meals' },
                 { description: 'Lunch special', amount: 10.80, category: 'meals' },
             ],
-            raw: { provider: 'mock', note: 'canned data — no real OCR performed' },
+            raw: { provider: 'mock', note: 'canned data - no real OCR performed' },
             fieldConfidence: {
                 merchant: 0.96,
                 date: 0.91,

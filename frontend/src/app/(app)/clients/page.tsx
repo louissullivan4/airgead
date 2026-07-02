@@ -56,7 +56,7 @@ const orgCategoryLabel = (slug: string) =>
 
 const num = (v: string | number) => Number(v) || 0;
 
-// Readiness at a glance — the tax-season "nothing to chase" signal, derived
+// Readiness at a glance - the tax-season "nothing to chase" signal, derived
 // from the stats already on the row (this tax year's records).
 const QUIET_AFTER_DAYS = 60;
 
@@ -270,7 +270,7 @@ export default function ClientsPage() {
                     </td>
                     {isAdmin && (
                       <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
-                        {c.owner_name ?? "—"}
+                        {c.owner_name ?? "-"}
                       </td>
                     )}
                     <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
@@ -286,7 +286,7 @@ export default function ClientsPage() {
                       {num(c.txn_count)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
-                      {c.last_activity ? new Date(c.last_activity).toLocaleDateString() : "—"}
+                      {c.last_activity ? new Date(c.last_activity).toLocaleDateString() : "-"}
                     </td>
                     <td className="px-3 py-3 text-right">
                       <DropdownMenu>

@@ -1,5 +1,5 @@
 -- ============================================================================
--- DESTRUCTIVE / DATA-DEPENDENT — do not run until db/schema.sql is committed
+-- DESTRUCTIVE / DATA-DEPENDENT - do not run until db/schema.sql is committed
 -- and the inviter_id question is answered (is inviter_id actually populated?).
 -- Run the dry-run queries below FIRST and eyeball the counts.
 -- ============================================================================
@@ -17,7 +17,7 @@
 -- Up Migration
 
 -- ----------------------------------------------------------------------------
--- [INVITER BRANCH — DISABLED BY DEFAULT]
+-- [INVITER BRANCH - DISABLED BY DEFAULT]
 -- If inviter_id IS populated and you want invited users to join their
 -- inviter's organisation as members (rather than each getting a solo org),
 -- UNCOMMENT the UPDATE below. It must run AFTER top-level (non-invited) users

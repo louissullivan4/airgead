@@ -84,7 +84,7 @@ export default function ClientDetailPage() {
     void load();
   }, [load]);
 
-  // Fetch the tax summary lazily — only once the tab is opened (or year changes).
+  // Fetch the tax summary lazily - only once the tab is opened (or year changes).
   useEffect(() => {
     if (view !== "Tax summary") return;
     let active = true;
@@ -181,7 +181,7 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-5">
-      {/* "Viewing someone else's data" context bar — unmistakable, not loud. */}
+      {/* "Viewing someone else's data" context bar - unmistakable, not loud. */}
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <span className="text-muted-foreground">Viewing </span>

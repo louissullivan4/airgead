@@ -2,12 +2,22 @@ const { createLogger, format, transports } = require('winston');
 const path = require('path');
 const kleur = require('kleur');
 const { BRAND } = require('../config/brand');
+const { currentRequestId } = require('../middlewares/requestContext');
 
 const logDirectory = path.join(__dirname, '..', 'logs');
+
+// Stamp every line written inside a request's async chain with its request id
+// (set by middlewares/requestContext). Lines outside a request are untouched.
+const withRequestId = format((info) => {
+    const requestId = currentRequestId();
+    if (requestId) info.requestId = requestId;
+    return info;
+});
 
 const logger = createLogger({
     level: 'silly',
     format: format.combine(
+        withRequestId(),
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         format.printf(({ timestamp, level, message, ...meta }) => {
             let log = `[${timestamp}] [${level}]: ${message}`;

@@ -1,5 +1,5 @@
 -- ============================================================================
--- DESTRUCTIVE / DATA-DEPENDENT — do not run until db/schema.sql is committed,
+-- DESTRUCTIVE / DATA-DEPENDENT - do not run until db/schema.sql is committed,
 -- the inviter_id question is answered, AND 002_backfill_orgs has completed
 -- successfully (every user must have an org_id, or this will fail).
 -- ============================================================================

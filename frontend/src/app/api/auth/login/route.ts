@@ -23,7 +23,8 @@ export async function POST(req: Request) {
   const data = await backendRes.json().catch(() => ({}));
   if (!backendRes.ok) {
     return NextResponse.json(
-      { error: data.error ?? "Invalid email or password." },
+      // `code` (e.g. 'email_unverified') lets the login page branch its UX.
+      { error: data.error ?? "Invalid email or password.", code: data.code },
       { status: backendRes.status },
     );
   }

@@ -16,7 +16,7 @@ router.get('/clients/:clientOrgId/transactions', accountantController.getClientT
 router.get('/clients/:clientOrgId/tax-summary', accountantController.getClientTaxSummary);
 router.get('/clients/:clientOrgId/export', accountantController.exportClient);
 router.delete('/clients/:clientOrgId/link', accountantController.revokeClient);
-// Reassign a client to another accountant — firm admin (owner) only.
+// Reassign a client to another accountant - firm admin (owner) only.
 router.patch('/clients/:clientOrgId/assign', requireOrgRole('owner'), accountantController.reassignClient);
 
 module.exports = router;

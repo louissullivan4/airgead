@@ -1,9 +1,9 @@
 // Form 11 "Extracts From Accounts" expense lines. The accountant re-keys a
-// sole trader's totals into these boxes every January — pre-bucketing the
+// sole trader's totals into these boxes every January - pre-bucketing the
 // year's categories into the same shape is exactly the re-keying we remove.
 //
 // Buckets mirror the real Form 11 lines (Trading Account / Expenses and
-// Deductions). Anything unmapped lands in "Other expenses" — correct-by-default
+// Deductions). Anything unmapped lands in "Other expenses" - correct-by-default
 // rather than clever. Capital-linked expenses must be EXCLUDED by the caller
 // (they are claimed via wear & tear, not as revenue expenses).
 
@@ -20,7 +20,7 @@ const FORM11_BUCKETS = [
 // category slug → bucket key. Slugs come from config/categoryTemplates.js
 // (org-editable, so owner-created slugs simply fall through to 'other').
 const CATEGORY_TO_BUCKET = {
-    // Purchases — goods for resale, materials, consumable stock.
+    // Purchases - goods for resale, materials, consumable stock.
     stock_purchases: 'purchases',
     materials: 'purchases',
     feed_bedding: 'purchases',
@@ -71,7 +71,7 @@ const toNumber = (v) => Number(v) || 0;
 
 // Aggregate revenue-expense rows into the Form 11 buckets. `labelOf(slug)`
 // resolves display labels from the org's category tree. Returns every bucket in
-// the canonical order (zero buckets included — the accountant expects to see
+// the canonical order (zero buckets included - the accountant expects to see
 // the whole shape of the form), each with its per-category breakdown.
 const bucketise = (expenseRows, labelOf = (slug) => slug) => {
     const byBucket = new Map(FORM11_BUCKETS.map((b) => [b.key, new Map()]));

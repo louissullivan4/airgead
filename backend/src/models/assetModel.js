@@ -13,7 +13,7 @@ const orgPredicate = (alias, orgId, paramIndex) => {
     };
 };
 
-// `q` is anything with .query() — the pool, or a client inside a transaction
+// `q` is anything with .query() - the pool, or a client inside a transaction
 // (the capital-expense save creates expense + asset atomically).
 const createAsset = async (q, asset) => {
     try {
@@ -46,7 +46,7 @@ const getAssetById = async (pool, id, orgId) => {
     }
 };
 
-// The whole org's register (the org is the business entity — members'
+// The whole org's register (the org is the business entity - members'
 // purchases roll up), same join the accountant reads use.
 const getAssetsByOrgId = async (pool, orgId) => {
     try {

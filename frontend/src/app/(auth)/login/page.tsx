@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { api, ApiError } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -16,18 +17,53 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  // The email-verification link bounces here: ?verified=1 on success,
+  // ?verified=expired when the token is stale (offer a resend below).
+  useEffect(() => {
+    const verified = new URLSearchParams(window.location.search).get("verified");
+    if (!verified) return;
+    if (verified === "1") toast.success("Email verified - you can sign in now.");
+    if (verified === "expired") {
+      setUnverified(true);
+      setError("That verification link has expired. Enter your email and request a new one.");
+    }
+    router.replace("/login");
+  }, [router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setUnverified(false);
     setLoading(true);
     try {
       await api.auth.login(email, password);
       router.push("/home");
       router.refresh();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "email_unverified") {
+        setUnverified(true);
+      }
       setError(err instanceof Error ? err.message : "Sign in failed");
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!email) {
+      setError("Enter your email address first, then request a new link.");
+      return;
+    }
+    setResending(true);
+    try {
+      await api.users.resendVerification(email);
+      toast.success("If that address needs verification, a new link is on its way.");
+    } catch {
+      toast.error("Could not send the link - please try again shortly.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -38,9 +74,19 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
             {error}
-          </p>
+            {unverified && (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resending}
+                className="mt-1 block font-semibold underline underline-offset-2 hover:no-underline disabled:opacity-60"
+              >
+                {resending ? "Sending…" : "Send a new verification link"}
+              </button>
+            )}
+          </div>
         )}
         <Field label="Email" htmlFor="email">
           <Input

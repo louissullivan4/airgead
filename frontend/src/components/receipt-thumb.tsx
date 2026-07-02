@@ -37,7 +37,7 @@ function ReceiptThumb({ expenseId, hasReceipt, receiptId, className }: ReceiptTh
   }, [expenseId, receiptId, present]);
 
   if (!present) {
-    return <span className={cn("text-muted-foreground/50", className)}>—</span>;
+    return <span className={cn("text-muted-foreground/50", className)}>-</span>;
   }
   if (!url) {
     return (

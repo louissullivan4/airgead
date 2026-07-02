@@ -309,7 +309,7 @@ const partialUpdateExpense = async (req, res) => {
         const scopeOrgId = scopeOrgIdFor(req);
 
         // Verify the target expense is in scope and owned by the caller (or an
-        // admin/accountant) before mutating — mirrors updateExpense/deleteExpense.
+        // admin/accountant) before mutating - mirrors updateExpense/deleteExpense.
         const existing = await expenseModel.getExpenseById(req.pool, id, scopeOrgId);
         if (!existing) {
             logger.warn('Expense not found with ID: %s', id);

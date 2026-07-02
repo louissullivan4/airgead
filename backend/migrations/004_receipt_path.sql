@@ -1,5 +1,5 @@
 -- ============================================================================
--- DESTRUCTIVE / DATA-DEPENDENT — do not run until db/schema.sql is committed.
+-- DESTRUCTIVE / DATA-DEPENDENT - do not run until db/schema.sql is committed.
 -- Converts existing expenses.receipt_image_url values from full public GCS URLs
 -- into bare object paths (e.g. "ids/abc.jpg"), matching the new storage scheme
 -- in src/middlewares/imageUpload.js (Task 6).

@@ -1,4 +1,4 @@
-# Phase 4 — Super-admin platform dashboard
+# Phase 4 - Super-admin platform dashboard
 
 A platform-wide surface for `platform_role='super_admin'`: an overview of **every**
 organisation and user (regardless of who created them), type-selectable invites,
@@ -13,21 +13,21 @@ GDPR-compliant deletion.
   `session.platformRole === 'super_admin'`.
 
 ## Enable / disable accounts (reversible)
-- **User** — `users.account_status` ('active' | 'suspended').
-- **Org** — `organisations.status` ('active' | 'suspended'), added by
+- **User** - `users.account_status` ('active' | 'suspended').
+- **Org** - `organisations.status` ('active' | 'suspended'), added by
   `migration 008_org_status.sql` (additive, reversible).
 - Enforced at **login** (`userController.login`): a suspended user, or a member of
-  a suspended org, gets 403. (Stateless JWTs already issued lapse at expiry —
+  a suspended org, gets 403. (Stateless JWTs already issued lapse at expiry -
   suspension blocks new logins.) Suspend a firm for non-payment, reactivate to
-  restore — no data loss.
+  restore - no data loss.
 
 ## GDPR hard-delete (irreversible)
 A full cascade in one transaction, plus best-effort removal of stored receipt
 images (`storage.deleteObject`, added for both the local and GCS drivers):
-- **Delete org** (`DELETE /admin/orgs/:id`) — `adminModel.deleteOrgCascade`:
+- **Delete org** (`DELETE /admin/orgs/:id`) - `adminModel.deleteOrgCascade`:
   erases the org, all its users, their expenses + receipts (+ image objects), and
   all `accountant_org_links` where the org is the accountant or the client.
-- **Delete user** (`DELETE /admin/users/:id`) — if the user **solely owns** their
+- **Delete user** (`DELETE /admin/users/:id`) - if the user **solely owns** their
   org, the whole org is cascaded; if they own an org with **other members** →
   **409** (delete the org or reassign first); a plain member is erased via
   `adminModel.deleteUserCascade` (their data removed, any links they owned have
@@ -62,14 +62,14 @@ gate); the client-detail page resolves an unlinked org's name via
 `GET /organisations/:id`.
 
 ## Frontend
-- `app/(app)/admin/page.tsx` — stat cards + Organisations table (Open / Suspend /
+- `app/(app)/admin/page.tsx` - stat cards + Organisations table (Open / Suspend /
   Delete) + Users table (Grant/Revoke super admin / Suspend / Delete), one search
   box, and an **Invite** button. Destructive actions confirm via `AlertDialog`;
   the caller's own rows hide self-destructive actions.
-- `components/invite-dialog.tsx` — gains an optional `kinds` selector (a
+- `components/invite-dialog.tsx` - gains an optional `kinds` selector (a
   `Segmented`); the admin passes Regular user / Accountant.
 
-## Tests — `backend/test/admin.test.js`
+## Tests - `backend/test/admin.test.js`
 Route guard (403 non-super / pass super); platform invite token flagging
 (accountant vs user) + unknown-kind 400; self-target blocks for role/status/org;
 delete routing (member → `deleteUserCascade`; sole owner → `deleteOrgCascade`;
@@ -78,4 +78,4 @@ suspended user and a suspended org.
 
 ## Seed
 `demo@rian.dev` is the platform super admin for now (`platform_role='super_admin'`,
-password `Password123!`) — log in to reach the Admin dashboard.
+password `Password123!`) - log in to reach the Admin dashboard.

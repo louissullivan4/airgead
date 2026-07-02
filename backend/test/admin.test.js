@@ -15,7 +15,7 @@ const { requirePlatformRole } = require('../src/middlewares/tenantScope');
 
 const makeRes = () => ({ status: sinon.stub().returnsThis(), json: sinon.stub() });
 
-describe('Phase 4 — super-admin route guard', () => {
+describe('Phase 4 - super-admin route guard', () => {
   afterEach(() => sinon.restore());
 
   it('403s a non-super_admin', () => {
@@ -36,7 +36,7 @@ describe('Phase 4 — super-admin route guard', () => {
   });
 });
 
-describe('Phase 4 — platform invite', () => {
+describe('Phase 4 - platform invite', () => {
   afterEach(() => sinon.restore());
 
   const reqFor = (body) => ({ pool: {}, body, user: { userId: 'super', orgId: 'plat', platformRole: 'super_admin' } });
@@ -75,7 +75,7 @@ describe('Phase 4 — platform invite', () => {
   });
 });
 
-describe('Phase 4 — role/status guards (no self-targeting)', () => {
+describe('Phase 4 - role/status guards (no self-targeting)', () => {
   afterEach(() => sinon.restore());
 
   it('refuses to change your own platform role', async () => {
@@ -106,7 +106,7 @@ describe('Phase 4 — role/status guards (no self-targeting)', () => {
   });
 });
 
-describe('Phase 4 — GDPR delete', () => {
+describe('Phase 4 - GDPR delete', () => {
   afterEach(() => sinon.restore());
 
   it('deletes a plain member via deleteUserCascade and cleans images', async () => {
@@ -175,7 +175,7 @@ describe('Phase 4 — GDPR delete', () => {
   });
 });
 
-describe('Phase 4 — login blocks suspended accounts', () => {
+describe('Phase 4 - login blocks suspended accounts', () => {
   afterEach(() => sinon.restore());
 
   const bcrypt = require('bcrypt');

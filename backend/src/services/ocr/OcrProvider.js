@@ -1,5 +1,5 @@
 /**
- * OcrProvider — the receipt-OCR seam interface.
+ * OcrProvider - the receipt-OCR seam interface.
  *
  * Phase 2 builds this seam but does NOT rely on it: the live flow runs with OCR
  * disabled (OCR_PROVIDER=none). It exists so switching OCR on later is a config

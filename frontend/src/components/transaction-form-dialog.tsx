@@ -104,7 +104,7 @@ function CategorySelect({
   );
 }
 
-// Capital-item toggle (Phase 5). Marks the expense as capital expenditure —
+// Capital-item toggle (Phase 5). Marks the expense as capital expenditure -
 // it joins the asset register and is claimed via wear & tear (12.5%/yr over 8
 // years) instead of as a revenue expense. Pre-ticked when the chosen category
 // is capital-flagged; always the user's call.
@@ -137,7 +137,7 @@ function CapitalToggle({
             Capital item
           </span>
           <span className="text-xs text-muted-foreground">
-            Equipment, machinery, vehicles — claimed over 8 years via the asset register.
+            Equipment, machinery, vehicles - claimed over 8 years via the asset register.
           </span>
         </span>
       </label>
@@ -170,7 +170,7 @@ function ConfidenceHint({ enabled, score }: { enabled: boolean; score?: number }
   return (
     <span className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
       <AlertTriangle className="size-3.5" />
-      Low confidence — please check
+      Low confidence - please check
     </span>
   );
 }
@@ -414,7 +414,7 @@ function TransactionFormDialog({
                   alt="Cleaned receipt"
                   className="size-12 rounded-md border border-border object-cover"
                 />
-                <span className="text-sm text-muted-foreground">Receipt attached — tap to view</span>
+                <span className="text-sm text-muted-foreground">Receipt attached - tap to view</span>
               </a>
             )}
 

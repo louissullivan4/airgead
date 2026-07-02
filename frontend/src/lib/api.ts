@@ -8,19 +8,22 @@
 
 const PROXY = "/api/proxy";
 
-/** Thrown by the API client so callers can show `err.message`. */
+/** Thrown by the API client so callers can show `err.message` (and branch on `err.code`). */
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Machine-readable code from the backend (e.g. 'email_unverified', 'subscription_required'). */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
-async function parseError(res: Response): Promise<string> {
-  const body = (await res.json().catch(() => null)) as { error?: string } | null;
-  return body?.error ?? res.statusText ?? "Request failed";
+async function parseError(res: Response): Promise<{ message: string; code?: string }> {
+  const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+  return { message: body?.error ?? res.statusText ?? "Request failed", code: body?.code };
 }
 
 // A 401 from the proxy means the session is gone (logged out, expired, or the
@@ -41,7 +44,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     handleUnauthorized(res.status);
-    throw new ApiError(await parseError(res), res.status);
+    const { message, code } = await parseError(res);
+    throw new ApiError(message, res.status, code);
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -53,7 +57,8 @@ async function requestBlob(path: string): Promise<Blob> {
   const res = await fetch(`${PROXY}${path}`);
   if (!res.ok) {
     handleUnauthorized(res.status);
-    throw new ApiError(await parseError(res), res.status);
+    const { message, code } = await parseError(res);
+    throw new ApiError(message, res.status, code);
   }
   return res.blob();
 }
@@ -65,7 +70,10 @@ async function auth<T>(path: string, body?: unknown): Promise<T> {
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  if (!res.ok) {
+    const { message, code } = await parseError(res);
+    throw new ApiError(message, res.status, code);
+  }
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
@@ -88,6 +96,12 @@ export const api = {
       }),
     requestPasswordReset: (email: string) =>
       request<void>("/users/request-password-reset", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    /** Re-send the email-verification link (rate-limited; never confirms account existence). */
+    resendVerification: (email: string) =>
+      request<void>("/users/resend-verification", {
         method: "POST",
         body: JSON.stringify({ email }),
       }),
@@ -158,6 +172,24 @@ export const api = {
     /** The caller org's full tax picture for a year (Form 11, capital allowances, VAT). */
     taxSummary: (year?: number) =>
       request<TaxSummary>(`/reports/tax-summary${year ? `?year=${year}` : ""}`),
+  },
+  // Phase 6 billing. `status` drives the trial banner and the Settings card;
+  // when the backend reports enforced:false both render nothing.
+  billing: {
+    /** The caller org's entitlement + whether billing is enforced platform-wide. */
+    status: () => request<BillingStatus>("/billing/status"),
+    /** Owner-only: Stripe Checkout URL (solo price, or per-seat for practices). */
+    checkout: () =>
+      request<{ url: string }>("/billing/checkout-session", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    /** Owner-only: Stripe customer-portal URL (cards, invoices, cancellation). */
+    portal: () =>
+      request<{ url: string }>("/billing/portal-session", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
   },
   organisations: {
     get: (id: string) => request<Organisation>(`/organisations/${id}`),
@@ -244,7 +276,7 @@ export const api = {
 };
 
 // ---------------------------------------------------------------------------
-// Types — these mirror the *actual* backend shapes (verified against the
+// Types - these mirror the *actual* backend shapes (verified against the
 // Express controllers/models), not the earlier placeholder definitions.
 // ---------------------------------------------------------------------------
 
@@ -265,7 +297,7 @@ export interface AuthUser {
   role: "user" | "admin" | "accountant";
 }
 
-/** A transaction row. Income is `category === 'income'` — there is no boolean. */
+/** A transaction row. Income is `category === 'income'` - there is no boolean. */
 export interface Expense {
   id: string;
   user_id: string;
@@ -283,6 +315,31 @@ export interface Expense {
   is_capital?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// --- Billing (Phase 6) ------------------------------------------------------
+
+/** The caller org's entitlement, returned by GET /billing/status. */
+export interface BillingStatus {
+  /** False until the platform flips BILLING_ENFORCED at GA. */
+  enforced: boolean;
+  /** Whether Stripe keys exist server-side (checkout/portal will work). */
+  configured: boolean;
+  active: boolean;
+  tier: "trial" | "standard";
+  status: "none" | "trialing" | "active" | "past_due" | "canceled" | "trial_expired";
+  reason: "practice" | "subscribed" | "covered_seat" | "trial" | "expired";
+  trialEndsAt: string | null;
+  /** Set when a paying practice covers this org as a seat. */
+  coveredByPracticeOrgId: string | null;
+  /** Raw organisations.billing_status (a practice is always active yet may have no billing set up). */
+  billingStatus: "none" | "trialing" | "active" | "past_due" | "canceled";
+  isPractice: boolean;
+  orgId: string;
+  trialDays: number;
+  tierInfo: { key: string; label: string; blurb: string };
+  /** Practices only: active client seats being paid for. */
+  seatCount?: number;
 }
 
 // --- Capital assets & tax summary (Phase 5) --------------------------------
@@ -336,7 +393,7 @@ export interface AllowanceRow {
   acquiredDate: string;
   disposalDate: string | null;
   disposalProceeds: number | null;
-  /** 1..8 — which year of the write-off this is. */
+  /** 1..8 - which year of the write-off this is. */
   yearIndex: number;
   allowance: number;
   openingWdv: number;
@@ -475,7 +532,7 @@ export interface CreateExpenseData {
   date?: string;
   /**
    * Capital item marker. Create: true also writes an asset-register row.
-   * Update (PATCH): tri-state — true upserts the linked asset, false removes
+   * Update (PATCH): tri-state - true upserts the linked asset, false removes
    * it, omitted leaves the register alone.
    */
   is_capital?: boolean;
@@ -539,7 +596,7 @@ export interface Organisation {
   is_accountant_practice?: boolean;
   /** Lifecycle status; a suspended org's users cannot log in. */
   status?: "active" | "suspended";
-  /** VAT treatment — drives the VAT section of the tax summary. */
+  /** VAT treatment - drives the VAT section of the tax summary. */
   vat_status?: VatStatus;
   created_at?: string;
   updated_at?: string;
@@ -613,7 +670,7 @@ export interface ClientSummary {
   expense_total: string | number;
   income_total: string | number;
   last_activity: string | null;
-  /** Owning accountant (created_by) — shown to the firm admin. */
+  /** Owning accountant (created_by) - shown to the firm admin. */
   created_by: string | null;
   owner_name: string | null;
 }
@@ -668,6 +725,8 @@ export interface UserProfile {
   subscription_level?: string;
   account_status?: string;
   renewal_date?: string;
+  /** Null = verification pending (Phase 6); undefined on pre-migration backends. */
+  email_verified_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

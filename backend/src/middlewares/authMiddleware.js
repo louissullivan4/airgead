@@ -12,7 +12,7 @@ const authenticateToken = (req, res, next) => {
         if (err) return res.status(403).json({ error: 'Access denied. Invalid bearer token.' });
 
         // Backward compatibility: tokens issued before Phase 0 carry no orgId.
-        // Treat their absence as "needs re-login" (401) — never a 500/403/crash.
+        // Treat their absence as "needs re-login" (401) - never a 500/403/crash.
         if (!user || !user.orgId) {
             return res.status(401).json({ error: 'Session out of date, please log in again.' });
         }

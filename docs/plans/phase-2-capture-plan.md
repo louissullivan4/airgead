@@ -1,4 +1,4 @@
-# Phase 2 — Camera-first receipt capture (manual entry, OCR built-but-dormant)
+# Phase 2 - Camera-first receipt capture (manual entry, OCR built-but-dormant)
 
 ## Context
 
@@ -11,7 +11,7 @@ validated (no paid provider, no API key, no live call now).
 This change:
 1. Splits receipts from expense line items (1 receipt → many expenses).
 2. Cleans the captured image server-side (binarise to a tiny 1-bit PNG) before storing.
-3. Builds an OCR adapter **seam** wired only to a mock, behind an off-by-default flag — a clean
+3. Builds an OCR adapter **seam** wired only to a mock, behind an off-by-default flag - a clean
    future switch-on, not a dependency we pay for today.
 4. Makes the Add-expense flow camera-first with a manual multi-line form.
 
@@ -24,12 +24,12 @@ This change:
 - The form is `frontend/src/components/transaction-form-dialog.tsx`, NOT `TransactionFormModal.tsx`.
 - Camera: **native `<input type="file" accept="image/*" capture="environment">`** (confirmed), not
   live getUserMedia.
-- Crop: **binarise-only now via `sharp`, perspective-crop left as a TODO** (confirmed) — avoids a
+- Crop: **binarise-only now via `sharp`, perspective-crop left as a TODO** (confirmed) - avoids a
   finicky native OpenCV dep on the `node:20-alpine` image.
 
 ### Key facts confirmed from the codebase
 - `users.id`, `expenses.id`, `expenses.user_id` are all **uuid**. `expenses.amount` is `numeric(12,2)`.
-  `expenses` has no `org_id` — tenant scoping is via the user→org subquery (`orgPredicate`).
+  `expenses` has no `org_id` - tenant scoping is via the user→org subquery (`orgPredicate`).
 - Migrations: **node-pg-migrate** SQL format with `-- Up Migration` / `-- Down Migration` markers,
   `IF NOT EXISTS` guards, constraints wrapped in `DO $$ ... pg_constraint ... END$$`. Latest is
   `005`; next is `006`. Scripts: `npm run migrate:up` / `migrate:down`.
@@ -49,14 +49,14 @@ This change:
 
 ---
 
-## PR 1 — Data layer (migration + models), tested
+## PR 1 - Data layer (migration + models), tested
 
 ### Migration `backend/migrations/006_receipts_and_line_items.sql`
 Follow the `005`/`001` style exactly (`-- Up Migration` / `-- Down Migration`, `IF NOT EXISTS`,
-guarded constraints). **Additive only — do not migrate existing `expenses` rows.**
+guarded constraints). **Additive only - do not migrate existing `expenses` rows.**
 
 Up:
-- `CREATE TABLE IF NOT EXISTS receipts (` — `id uuid PK DEFAULT gen_random_uuid()`,
+- `CREATE TABLE IF NOT EXISTS receipts (` - `id uuid PK DEFAULT gen_random_uuid()`,
   `user_id uuid NOT NULL` (FK → `users(id)`, matching the uuid type; add FK in a guarded `DO $$`
   block), `image_object_path text` (GCS/local object **key**, never a public URL),
   `parsed_data jsonb` (null now), `ocr_confidence numeric` (null now),
@@ -67,8 +67,8 @@ Up:
   (Default `'reviewed'` because the user fills everything in manually now; `'pending'` is reserved
   for the future OCR path.)
 - `ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_id uuid` + guarded FK → `receipts(id)`
-  (nullable — manual no-photo expenses still allowed). Add `merchant_name text`, `tax_amount numeric`.
-  **Keep `receipt_image_url`** (backward compat — do not drop).
+  (nullable - manual no-photo expenses still allowed). Add `merchant_name text`, `tax_amount numeric`.
+  **Keep `receipt_image_url`** (backward compat - do not drop).
 - `CREATE INDEX IF NOT EXISTS idx_expenses_receipt_id ON expenses(receipt_id);`
   `CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);`
 
@@ -86,7 +86,7 @@ Functions: `createReceipt(pool, receipt)`, `getReceiptById(pool, id, orgId)`,
 try/catch + `logger` style as `expenseModel.js`.
 
 ### Extend `backend/src/models/expenseModel.js`
-- `createExpense`: accept/persist `receipt_id`, `merchant_name`, `tax_amount` — **append** to the
+- `createExpense`: accept/persist `receipt_id`, `merchant_name`, `tax_amount` - **append** to the
   destructure + INSERT column/value lists; do **not** reorder existing params.
 - `updateExpense` / `partialUpdateExpense`: likewise persist `merchant_name`, `tax_amount`
   (append params, keep existing positions/`orgPredicate` indices correct).
@@ -99,7 +99,7 @@ try/catch + `logger` style as `expenseModel.js`.
 
 ---
 
-## PR 2 — Image cleanup + OCR seam (built, not wired live), tested
+## PR 2 - Image cleanup + OCR seam (built, not wired live), tested
 
 ### Add dependency
 Add `sharp` to `backend/package.json` (prebuilt musl binaries install cleanly on `node:20-alpine`;
@@ -108,21 +108,21 @@ no Dockerfile change needed).
 ### New `backend/src/utils/receiptCleanup.js`
 - `cleanReceipt(inputBuffer)` → `{ binarisedBuffer, cropped: boolean }`.
 - **Perspective crop: deferred.** Leave a clearly-commented `// TODO: perspective crop (OpenCV
-  findContours + warpPerspective) — deferred to avoid native dep on alpine` and a no-op
+  findContours + warpPerspective) - deferred to avoid native dep on alpine` and a no-op
   `cropReceipt()` seam that currently returns the full frame; always `cropped: false` for now.
   (Brief's rule: a missed crop beats one that cuts off the total.)
 - **Binarise with sharp:** grayscale → optional light blur → adaptive/conservative threshold to
-  **1-bit black/white**, output **PNG** (palette/1-bit — lossless, tiny for bilevel; never JPEG for
+  **1-bit black/white**, output **PNG** (palette/1-bit - lossless, tiny for bilevel; never JPEG for
   B&W text). Threshold tunable via a constant, default conservative to preserve faint thermal text.
 
 ### New OCR adapter seam under `backend/src/services/ocr/`
-- `OcrProvider.js` — interface/JSDoc: `extract(imageBuffer) → { merchant, date, total, tax,
+- `OcrProvider.js` - interface/JSDoc: `extract(imageBuffer) → { merchant, date, total, tax,
   currency, lineItems?, raw, fieldConfidence }`, where `lineItems` is
   `[{ description, amount, category? }]` (supports future multi-line).
-- `MockOcrProvider.js` — the **only** implementation now: returns canned plausible data (a merchant,
+- `MockOcrProvider.js` - the **only** implementation now: returns canned plausible data (a merchant,
   today's date, a total, a couple of line items) with fake `fieldConfidence` scores.
-- `HostedOcrProvider.js` — stub whose `extract` throws `NotImplemented`, with a comment listing
-  candidate vendors (Veryfi / Tabscanner / Eagle Doc / Azure Document Intelligence — **EU data
+- `HostedOcrProvider.js` - stub whose `extract` throws `NotImplemented`, with a comment listing
+  candidate vendors (Veryfi / Tabscanner / Eagle Doc / Azure Document Intelligence - **EU data
   residency required**).
 - `index.js` factory `getOcrProvider()` reads `process.env.OCR_PROVIDER` (default `'none'`):
   `'none'` → returns `null` (OCR fully disabled), `'mock'` → `MockOcrProvider`, `'hosted'` →
@@ -130,19 +130,19 @@ no Dockerfile change needed).
 
 ### Config
 - `backend/.env.example`: add `OCR_PROVIDER=none` and `OCR_AUTOFILL_ENABLED=false`.
-- Surface `OCR_AUTOFILL_ENABLED` to the frontend (see PR 4 — via a small public config value the app
+- Surface `OCR_AUTOFILL_ENABLED` to the frontend (see PR 4 - via a small public config value the app
   can read; default false).
 
 ### Tests
 - `MockOcrProvider.extract()` returns the documented shape (merchant/date/total/tax/currency +
-  `lineItems[]` + `fieldConfidence`) — unit test of the seam even though it's not wired live.
+  `lineItems[]` + `fieldConfidence`) - unit test of the seam even though it's not wired live.
 - `receiptCleanup.cleanReceipt()` on a small fixture image returns a non-empty `binarisedBuffer` and
   `cropped: false`.
 - `getOcrProvider()` returns `null` when `OCR_PROVIDER` unset/`none`, `MockOcrProvider` for `mock`.
 
 ---
 
-## PR 3 — Endpoints (OCR branch dormant)
+## PR 3 - Endpoints (OCR branch dormant)
 
 ### New `backend/src/controllers/receiptController.js` + `backend/src/routes/receiptRoutes.js`
 Route file mirrors `expenseRoutes.js`: `router.use(injectPool)` then
@@ -151,35 +151,35 @@ Route file mirrors `expenseRoutes.js`: `router.use(injectPool)` then
 `expenseController.js`.
 
 Endpoints (all `authenticateToken + tenantScope`, org-scoped):
-- **`POST /receipts/process`** — accepts the raw captured image (same base64 data-URI convention as
+- **`POST /receipts/process`** - accepts the raw captured image (same base64 data-URI convention as
   `imageUpload.js`). Flow: decode → `cleanReceipt()` → **(OCR only if `getOcrProvider()` returns
-  non-null — currently `none`, so skipped entirely)** → `storage.putObject` of the binarised PNG
+  non-null - currently `none`, so skipped entirely)** → `storage.putObject` of the binarised PNG
   under `org_{orgId}/{year}/{receiptId}.png` → `receiptModel.createReceipt` (store the **object
   path**, `receipt_status='reviewed'`, `parsed_data`/`ocr_confidence` null) → return
   `{ receiptId, signedUrl }` (`getSignedUrl`). Code the OCR branch so flipping `OCR_PROVIDER` later
   activates it (write `parsed_data`, `ocr_confidence`, `receipt_status='pending'`), but it's dormant.
-- **`POST /receipts/:id/expenses`** — accepts an **array** of line items; verifies the receipt is in
+- **`POST /receipts/:id/expenses`** - accepts an **array** of line items; verifies the receipt is in
   scope; creates one expense per item via `expenseModel.createExpense` with `receipt_id` set; leaves
   receipt `status='reviewed'`. Returns the created expenses. (This is what "save" calls.)
-- **`GET /receipts/:id/image-url`** — fresh signed URL via `getSignedUrl` (scope-checked).
-- **`GET /receipts/:id`** — receipt + its linked expense line items (`getExpensesByReceiptId`).
+- **`GET /receipts/:id/image-url`** - fresh signed URL via `getSignedUrl` (scope-checked).
+- **`GET /receipts/:id`** - receipt + its linked expense line items (`getExpensesByReceiptId`).
 
 ### Tests (`backend/test/`, Jest + sinon)
 - `POST /receipts/process` with OCR disabled: stub `storage.putObject` + `receiptModel.createReceipt`
   + `receiptCleanup`; assert receipt created, image stored under the org key, **no OCR provider
-  invoked** (spy on `getOcrProvider`/provider.extract — never called).
+  invoked** (spy on `getOcrProvider`/provider.extract - never called).
 - `POST /receipts/:id/expenses` with a 2-item array → two expenses created, both with the same
   `receipt_id`.
 - Tenant isolation: user A cannot `GET /receipts/:id` belonging to user B's org (scoped null/403).
 
 ---
 
-## PR 4 — Frontend camera-first flow + manual multi-line form (auto-fill coded but flag-off)
-**Do not commit / no PR — the user will handle git for this one.**
+## PR 4 - Frontend camera-first flow + manual multi-line form (auto-fill coded but flag-off)
+**Do not commit / no PR - the user will handle git for this one.**
 
 ### API + config (`frontend/src/lib/`)
 - Add `api.receipts`: `process(imageDataUrl) → { receiptId, signedUrl }`,
-  `createExpenses(receiptId, items[])`, `getImageUrl(receiptId)`, `get(receiptId)` — all via
+  `createExpenses(receiptId, items[])`, `getImageUrl(receiptId)`, `get(receiptId)` - all via
   `/api/proxy/receipts/...`.
 - Add `merchant_name`/`tax_amount`/`receipt_id` to the `Expense` type and create payloads.
 - Expose `OCR_AUTOFILL_ENABLED` (default `false`) as a frontend constant/public env
@@ -188,7 +188,7 @@ Endpoints (all `authenticateToken + tenantScope`, org-scoped):
 ### Capture entry (`frontend/src/app/(app)/transactions/page.tsx`)
 - The **Add** button opens a capture step (isolate this handler/component for a clean future swap to
   live camera or auto-fill). Use `<input type="file" accept="image/*" capture="environment">`
-  (native camera on mobile, file picker fallback on desktop) — reuse/extend `FileUpload`.
+  (native camera on mobile, file picker fallback on desktop) - reuse/extend `FileUpload`.
 - Always show a visible **"Skip photo"** that opens the existing blank manual form with **exactly**
   today's behaviour (no `receipt_id`). Preserve the `?add=1` deep-link.
 - On capture: `POST /receipts/process`, show a brief "Cleaning up receipt…" state, then open the form
@@ -241,4 +241,4 @@ Endpoints (all `authenticateToken + tenantScope`, org-scoped):
   Confirm **Skip photo** still creates a plain expense unchanged. Confirm no OCR/auto-fill UI renders.
 - **Flag check (do not enable live OCR):** with `OCR_PROVIDER=mock` +
   `NEXT_PUBLIC_OCR_AUTOFILL_ENABLED=true` locally, verify the dormant auto-fill path pre-fills from
-  the mock and shows confidence indicators — then revert both to defaults.
+  the mock and shows confidence indicators - then revert both to defaults.

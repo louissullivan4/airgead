@@ -259,6 +259,21 @@ const updateUserPassword = async (pool, email, newPasswordHash) => {
     }
 };
 
+// Phase 6 email verification: stamp the address as confirmed. Idempotent -
+// a second click on the link changes nothing. Returns the row or undefined.
+const setEmailVerifiedByEmail = async (pool, email) => {
+    try {
+        const result = await pool.query(
+            'UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = CURRENT_TIMESTAMP WHERE email = $1 RETURNING id, email, email_verified_at',
+            [email]
+        );
+        return result.rows[0];
+    } catch (error) {
+        logger.error('Error marking email verified', { email, error: error.message });
+        throw error;
+    }
+};
+
 const deleteUserByEmail = async (pool, email) => {
     try {
         const result = await pool.query('DELETE FROM users WHERE email = $1', [email]);
@@ -449,6 +464,7 @@ module.exports = {
     isEmailUnique,
     updateUserByEmail,
     updateUserPassword,
+    setEmailVerifiedByEmail,
     deleteUserByEmail,
     saveInviteToken,
     getUsersByInviterId,

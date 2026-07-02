@@ -9,6 +9,12 @@ router.get('/', authenticateToken, authoriseRole(['admin', 'accountant']), userC
 
 router.get('/accountant/users', authenticateToken, authoriseRole(['admin', 'accountant']), userController.getAssignedUsers);
 
+// Email-verification link target + resend. Registered BEFORE '/:id' so the
+// static path wins; both are unauthenticated by design (the link arrives in
+// an email; resend is strict-rate-limited in src/index.js).
+router.get('/verify-email', userController.verifyEmail);
+router.post('/resend-verification', userController.resendVerification);
+
 router.get('/:id', authenticateToken, userController.getUser);
 
 router.get('/email/:email', authenticateToken, userController.getUserByEmail);

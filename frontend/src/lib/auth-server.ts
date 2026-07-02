@@ -5,7 +5,7 @@ export { TOKEN_COOKIE };
 
 // Backend base URL as seen from the Next.js server (inside Docker this is the
 // service name; locally it falls back to localhost). This is the only place the
-// frontend talks to the API directly — the browser always goes via /api/proxy.
+// frontend talks to the API directly - the browser always goes via /api/proxy.
 export const BACKEND_URL =
   process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 

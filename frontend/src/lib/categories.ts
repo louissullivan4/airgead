@@ -2,7 +2,7 @@
 // currencies we support, and the visual language (icon + accent classes) used
 // by badges, the category breakdown bars, and transaction rows.
 //
-// Income is modelled as a category (`category === "income"`) — see lib/api.ts.
+// Income is modelled as a category (`category === "income"`) - see lib/api.ts.
 
 import {
   Banknote,

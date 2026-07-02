@@ -2,7 +2,7 @@
 --
 -- Phase 0 / Task 2: introduce the organisations table and evolve `users` into
 -- "accounts" without renaming it (live queries depend on the name `users`).
--- This migration is ADDITIVE and reversible. It does NOT backfill data — see
+-- This migration is ADDITIVE and reversible. It does NOT backfill data - see
 -- 002_backfill_orgs.sql for that (gated) step.
 --
 -- !!! TYPE RECONCILIATION REQUIRED BEFORE RUNNING !!!

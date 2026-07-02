@@ -8,7 +8,7 @@ const logger = require('./logger');
 // by STORAGE_DRIVER:
 //   - 'local' (default): images live on disk under LOCAL_STORAGE_DIR
 //     (backend/temp/receipts), served back through short-lived signed /files
-//     tokens. No cloud credentials required — ideal for local dev.
+//     tokens. No cloud credentials required - ideal for local dev.
 //   - 'gcs': Google Cloud Storage (private objects + V4 signed URLs) for prod.
 //
 // Both drivers store and return the SAME object key (e.g. "org_3/2026/abc.jpg"),

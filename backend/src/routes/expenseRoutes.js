@@ -2,13 +2,17 @@ const express = require('express');
 const expenseController = require('../controllers/expenseController');
 const { authenticateToken } = require('../middlewares/authMiddleware');
 const { scopeToOrg } = require('../middlewares/tenantScope');
+const { requireActiveSubscriptionForWrites } = require('../middlewares/billing');
 const injectPool = require('../middlewares/poolMiddleware');
 
 const router = express.Router();
 
 router.use(injectPool);
 // All expense routes are authenticated and scoped to the caller's org.
-router.use(authenticateToken, scopeToOrg);
+// Write verbs additionally require an active subscription (no-op until
+// BILLING_ENFORCED); reads always pass - expired orgs are read-only, not
+// locked out.
+router.use(authenticateToken, scopeToOrg, requireActiveSubscriptionForWrites);
 
 router.get('/', expenseController.getExpenses);
 router.get('/users/:id', expenseController.getExpensesByUserId);

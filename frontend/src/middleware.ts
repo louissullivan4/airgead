@@ -4,7 +4,7 @@ import { TOKEN_COOKIE, AUTH_PATHS } from "@/lib/constants";
 // Route guard: unauthenticated users may see the public landing page ("/") and
 // the auth pages; everything else redirects to /login. Authenticated users
 // hitting the landing or an auth page are sent to /home. Presence of the cookie
-// is sufficient here — the proxy enforces real validity and clears it on a 401.
+// is sufficient here - the proxy enforces real validity and clears it on a 401.
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasToken = req.cookies.has(TOKEN_COOKIE);

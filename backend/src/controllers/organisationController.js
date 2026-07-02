@@ -23,7 +23,7 @@ const allowOrgAccess = (req, res) => {
 };
 
 // Shallow structural validation for a category tree posted by the client. We
-// keep it lenient (slugs/labels are strings, children optional) — the tree is
+// keep it lenient (slugs/labels are strings, children optional) - the tree is
 // config, not referential data.
 const isNodeArray = (arr) =>
     Array.isArray(arr) &&
@@ -77,7 +77,7 @@ const getCategories = async (req, res) => {
 };
 
 // VAT treatments the tax summary understands (mirrors the DB CHECK from
-// migration 009 — validate here so a typo 400s instead of 500ing).
+// migration 009 - validate here so a typo 400s instead of 500ing).
 const VAT_STATUSES = ['not_registered', 'registered', 'flat_rate_farmer'];
 
 // Owner-only (enforced by requireOrgRole('owner') on the route) + org-scoped.
@@ -104,7 +104,7 @@ const updateOrganisation = async (req, res) => {
     }
 };
 
-// GET /organisations/:id/members — owner-only (enforced on the route) + scoped.
+// GET /organisations/:id/members - owner-only (enforced on the route) + scoped.
 // Lists everyone in the org (members' submissions roll up to the org).
 const getMembers = async (req, res) => {
     if (!allowOrgAccess(req, res)) return;
@@ -117,7 +117,7 @@ const getMembers = async (req, res) => {
     }
 };
 
-// POST /organisations/:id/invite-member — owner-only (enforced on the route).
+// POST /organisations/:id/invite-member - owner-only (enforced on the route).
 // Sends a MEMBER invite: the invitee joins this org (inviter_id token, handled
 // by register's mode='invite'). Distinct from the accountant client invite.
 const inviteMember = async (req, res) => {

@@ -30,6 +30,9 @@ function SignupForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Consent is required; the timestamp of acceptance IS the account-creation
+  // time (noted in the privacy policy), so nothing extra is sent.
+  const [consent, setConsent] = useState(false);
 
   // Optional org-creation step (self-serve only). Invitees join the inviter's
   // org, so the section is hidden for them.
@@ -44,11 +47,15 @@ function SignupForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!consent) {
+      setError("Please agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     setLoading(true);
     try {
       // Currency defaults to EUR; address/occupation/tax details are collected
       // later in Settings to keep signup short. The organisation is sent only
-      // when the user opened the section and named it — otherwise the backend
+      // when the user opened the section and named it - otherwise the backend
       // auto-creates a personal org.
       const organisation =
         !inviteToken && showOrg && orgName.trim()
@@ -84,7 +91,7 @@ function SignupForm() {
       <h1 className="text-2xl font-semibold tracking-tight">Create your account</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {inviteToken
-          ? "You've been invited — finish setting up your account."
+          ? "You've been invited - finish setting up your account."
           : `Start tracking expenses with ${BRAND}. It's free.`}
       </p>
 
@@ -141,7 +148,7 @@ function SignupForm() {
               <div>
                 <p className="text-sm font-medium">Set up your organisation</p>
                 <p className="text-xs text-muted-foreground">
-                  Optional — tailors your expense categories to your trade. You can do this later in Settings.
+                  Optional - tailors your expense categories to your trade. You can do this later in Settings.
                 </p>
               </div>
               <Button
@@ -237,7 +244,37 @@ function SignupForm() {
           </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <label htmlFor="consent" className="flex cursor-pointer items-start gap-3 text-sm">
+          <input
+            id="consent"
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-0.5 size-4 accent-primary"
+            required
+          />
+          <span className="text-muted-foreground">
+            I agree to the{" "}
+            <Link
+              href="/terms"
+              target="_blank"
+              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy"
+              target="_blank"
+              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+
+        <Button type="submit" className="w-full" disabled={loading || !consent}>
           {loading && <Spinner />}
           {loading ? "Creating account…" : "Create account"}
         </Button>

@@ -1,4 +1,4 @@
-# Phase 5 — Irish tax engine: capital allowances, VAT treatment, tax-season pack
+# Phase 5 - Irish tax engine: capital allowances, VAT treatment, tax-season pack
 
 ## Context (why this phase, per the design thinking)
 
@@ -7,10 +7,10 @@ accountant workspace/firms, and the super-admin surface. What is NOT built yet i
 the thing `docs/design-thinking.md` calls **the moat** (Hill 3):
 
 > "An Irish equine/agricultural business and its accountant can handle the
-> genuinely fiddly stuff — capital allowances on equipment, livestock, motor/
-> mileage, flat-rate farmer VAT — with a tool built for their tax reality."
+> genuinely fiddly stuff - capital allowances on equipment, livestock, motor/
+> mileage, flat-rate farmer VAT - with a tool built for their tax reality."
 
-and the deepening of Hill 1's wow — Liam opens the dashboard and *nothing needs
+and the deepening of Hill 1's wow - Liam opens the dashboard and *nothing needs
 chasing*, then one export gives him the **pre-sorted hard part**, not just a flat
 transaction list. Storyboard panel 4 ("the tool already knows it's a
 capital-allowance item, not a straight expense") and panel 6 ("one-click export…
@@ -30,13 +30,13 @@ car caps, bank feeds, e-invoicing output (Hill 4 positioning only).
   (TCA 1997 s.284). Allowance starts in the year the asset comes into use
   (we use the year of `acquired_date`); none from the year of disposal on.
 - **Motor vehicles (passenger cars)**: allowable cost capped at the specified
-  amount **€24,000**. (Emissions banding deliberately simplified away in v1 —
+  amount **€24,000**. (Emissions banding deliberately simplified away in v1 -
   the cap is applied to `asset_type='motor_vehicle'` only; lorries/horseboxes/
   tractors are `plant_machinery`, uncapped.)
 - **Flat-rate farmer addition** (unregistered farmers): per-year rate table
   `2023: 5.0% · 2024: 4.8% · 2025: 5.1%`, latest-known fallback. Flat-rate
   farmers do not reclaim input VAT; they may reclaim VAT on farm
-  buildings/structures, fencing, drainage via **VAT 58** — we total the spend in
+  buildings/structures, fencing, drainage via **VAT 58** - we total the spend in
   vat58-flagged categories as a prompt.
 - Tax year = calendar year (already the convention: `TAX_YEAR()` in
   `accountantController`, year windows in `expenseModel`).
@@ -49,7 +49,7 @@ car caps, bank feeds, e-invoicing output (Hill 4 positioning only).
 - Tenant scoping: `orgPredicate(alias, orgId, paramIndex)` in
   `expenseModel`/`receiptModel` (user→org subquery; `orgId=null` = super-admin
   bypass). Controllers use `scopeOrgIdFor(req)`; accountant access via
-  `assertClientAccess` (active link + ownership) — reuse, don't reinvent.
+  `assertClientAccess` (active link + ownership) - reuse, don't reinvent.
 - Org-level reads for the accountant use `getExpensesByOrgId(AndYear)`.
 - `organisations.categories` is an org-editable jsonb tree seeded from
   `config/categoryTemplates.js`; controller validation (`isNodeArray`) tolerates
@@ -93,7 +93,7 @@ Design choices:
   revenue expense.
 - Standalone assets (`expense_id` null) support opening balances / pre-app
   purchases, added from the Tax summary page.
-- W&T is **computed, never stored** — a pure function of (cost, type,
+- W&T is **computed, never stored** - a pure function of (cost, type,
   acquired/disposal dates, year), so there is no schedule state to drift.
 
 ### Category template metadata
@@ -106,23 +106,23 @@ stored trees without flags → the frontend falls back to a known-slug set
 
 ## Tax engine (`backend/src/services/tax/`, pure + orchestrator)
 
-- `wearAndTear.js` — `WT_RATE=0.125`, `WRITE_OFF_YEARS=8`,
+- `wearAndTear.js` - `WT_RATE=0.125`, `WRITE_OFF_YEARS=8`,
   `MOTOR_COST_CAP=24000`; `allowableCost(asset)`;
   `allowanceForYear(asset, year)` (0 before acquisition year, 0 from the 9th
   year, 0 from the disposal year; final-year allowance absorbs rounding so the
   8 years sum exactly to allowable cost); `scheduleForYear(assets, year)` →
   per-asset rows `{ yearIndex 1..8, allowance, openingWdv, closingWdv, capped,
   disposed }` + totals.
-- `vat.js` — flat-rate table + `vatSummary({ vatStatus, expenses,
+- `vat.js` - flat-rate table + `vatSummary({ vatStatus, expenses,
   capitalExpenseIds, year })` → `{ vatStatus, flatRateAddition, vatOnPurchases,
   vatOnIncome, vat58EligibleSpend }` (vat58 spend only surfaced for
   flat-rate/unregistered farmers).
-- `form11.js` — category-slug → Form 11 trading-account heading map
+- `form11.js` - category-slug → Form 11 trading-account heading map
   (Purchases / Wages / Motor & travel / Repairs / Rent & rates / Light, heat &
   phone / Professional fees / Insurance / Other) with `bucketise(expenses)`;
   **capital-linked expenses are excluded from the buckets** (they get W&T
   instead) and totalled separately as capital expenditure.
-- `taxSummaryService.js` — `buildTaxSummary(pool, orgId, year)`: pulls org (vat
+- `taxSummaryService.js` - `buildTaxSummary(pool, orgId, year)`: pulls org (vat
   status + category tree for labels), the year's expenses, the org's assets →
   returns `{ year, vatStatus, totals { income, revenueExpenses,
   capitalExpenditure, wearAndTear, netBeforeAdjustments }, byCategory[],
@@ -148,10 +148,10 @@ Capture paths learn capital items (transactional):
 - `PATCH /expenses/:id` accepts `is_capital` tri-state: `true` upserts the
   linked asset (cost/description follow the expense), `false` deletes it,
   omitted leaves it alone.
-- `DELETE /expenses/:id` — DB cascade removes the linked asset.
+- `DELETE /expenses/:id` - DB cascade removes the linked asset.
 
 Export upgrades (reusing the existing zip path):
-- `gf.generateExcel(expenses, imagesDir, filePath, taxSummary?)` — optional 4th
+- `gf.generateExcel(expenses, imagesDir, filePath, taxSummary?)` - optional 4th
   arg adds three sheets: **Tax summary** (Form 11 buckets, income, capital
   expenditure, W&T, net), **Capital allowances** (the schedule), **VAT**. The
   Expenses sheet + CSV gain a `Capital` column (from
@@ -163,7 +163,7 @@ Export upgrades (reusing the existing zip path):
 ## Frontend
 
 - **Capture** (`transaction-form-dialog.tsx`): choosing a capital-flagged
-  category auto-suggests "Capital item — claim over 8 years via the asset
+  category auto-suggests "Capital item - claim over 8 years via the asset
   register" (checkbox, pre-ticked when flagged, always available); ticked shows
   an asset-type select (Plant & machinery / Motor vehicle (car)). Works on both
   the single path and per-line in receipt mode. `api` payloads carry
@@ -180,22 +180,22 @@ Export upgrades (reusing the existing zip path):
   unchanged (now richer).
 - **Clients dashboard**: per-row **readiness status** derived from the
   existing stats (green "Up to date" ≤60d activity; amber "Gone quiet" >60d;
-  red "No records" when 0 txns this year) — the all-green "nothing to chase"
+  red "No records" when 0 txns this year) - the all-green "nothing to chase"
   moment.
 - **Settings**: VAT status select (business orgs) → `PATCH /organisations/:id`
   (`vat_status` added to `ORG_UPDATABLE_FIELDS`).
 
-## Tests (Jest + sinon, mocked — no live DB)
+## Tests (Jest + sinon, mocked - no live DB)
 
-- `wearAndTear.test.js` — year windows, motor cap, 8-year exhaustion with exact
+- `wearAndTear.test.js` - year windows, motor cap, 8-year exhaustion with exact
   rounding, disposal cutoff, schedule totals.
-- `taxEngine.test.js` — form11 bucketing excludes capital-linked expenses; VAT
+- `taxEngine.test.js` - form11 bucketing excludes capital-linked expenses; VAT
   summary per status incl. flat-rate year table + vat58 spend.
-- `assetModel.test.js` — orgPredicate scoping on read/update/delete.
-- `assetLifecycle.test.js` — `POST /expenses` with `is_capital` runs one
+- `assetModel.test.js` - orgPredicate scoping on read/update/delete.
+- `assetLifecycle.test.js` - `POST /expenses` with `is_capital` runs one
   transaction (expense + asset, COMMIT); receipt multi-line with a capital line;
   PATCH `is_capital:false` deletes the asset; standalone asset CRUD scoping.
-- `taxSummary.test.js` — own-org endpoint uses the caller's org; accountant
+- `taxSummary.test.js` - own-org endpoint uses the caller's org; accountant
   endpoint 403s unlinked (data layer untouched) and passes super_admin;
   summary shape.
 - Organisation: `vat_status` accepted by `updateOrg` whitelist.
@@ -208,7 +208,7 @@ equipment asset so the Tax summary page is populated on first login.
 
 ## Verification
 
-- `cd backend && npm test` — all suites green.
+- `cd backend && npm test` - all suites green.
 - Migration round-trip `npm run migrate:up` / `migrate:down` clean.
 - `cd frontend && npm run build` (types + lint) green.
 - Manual e2e: add expense with capital category → asset appears in Tax summary

@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 
-// Phase 0 tenant scoping: expenses key on user_id only (no expenses.org_id yet —
+// Phase 0 tenant scoping: expenses key on user_id only (no expenses.org_id yet -
 // that denormalisation is a Phase 0.5 follow-up). We enforce isolation via the
 // user -> org relationship: a row is in-scope when its user_id belongs to the
 // caller's org. Pass orgId = null/undefined to bypass scoping (super_admin only).
@@ -17,7 +17,7 @@ const orgPredicate = (alias, orgId, paramIndex) => {
     };
 };
 
-// Core INSERT. `q` is anything with .query() — the pool, or a client inside a
+// Core INSERT. `q` is anything with .query() - the pool, or a client inside a
 // transaction (createExpensesWithAssets).
 const insertExpense = async (q, expense) => {
     const { user_id, title, description, category, amount, currency, receipt_image_url,
@@ -46,7 +46,7 @@ const createExpense = async (pool, expense) => {
 };
 
 // Phase 5: create one or more expenses, each optionally with a linked
-// asset-register row, in a SINGLE transaction — a multi-line receipt save (and
+// asset-register row, in a SINGLE transaction - a multi-line receipt save (and
 // the single capital-expense save) is all-or-nothing. `items` is
 // [{ expense, asset: { description?, asset_type?, acquired_date? } | null }];
 // the asset's cost/category/currency follow the expense line.
@@ -86,11 +86,20 @@ const createExpensesWithAssets = async (pool, items) => {
     }
 };
 
-// Phase 5: reads expose `is_capital` — true when an asset-register row is
+// Phase 5: reads expose `is_capital` - true when an asset-register row is
 // linked to the expense (that row's existence IS the capital marker; there is
 // no flag column). EXISTS avoids join-duplication risk.
+//
+// `receipt_object_path` surfaces the Phase 2 receipt image location: camera
+// captures store the image on the receipts row (image_object_path), NOT in
+// the legacy expenses.receipt_image_url column, so exports/embeds must read
+// both. Scalar subqueries keep the FROM clause single-table (the unqualified
+// orgPredicate SQL stays valid) and cannot duplicate rows.
 const IS_CAPITAL_SELECT =
-    'SELECT expenses.*, EXISTS(SELECT 1 FROM assets a WHERE a.expense_id = expenses.id) AS is_capital FROM expenses';
+    `SELECT expenses.*,
+            EXISTS(SELECT 1 FROM assets a WHERE a.expense_id = expenses.id) AS is_capital,
+            (SELECT r.image_object_path FROM receipts r WHERE r.id = expenses.receipt_id) AS receipt_object_path
+     FROM expenses`;
 
 const getExpensesByUserIdNoIncome = async (pool, user_id, orgId) => {
     try {

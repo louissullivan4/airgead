@@ -8,10 +8,10 @@ const { vatSummary } = require('./vat');
 
 // Assembles the year's full tax picture for one org. This single shape powers
 // the trader's Tax summary page, the accountant's client Tax summary tab, and
-// the extra sheets in the Excel export — one computation, three surfaces.
+// the extra sheets in the Excel export - one computation, three surfaces.
 //
 // Correctness rule that everything downstream leans on: an expense linked to an
-// asset-register row is CAPITAL — excluded from the revenue category totals and
+// asset-register row is CAPITAL - excluded from the revenue category totals and
 // Form 11 buckets (it is claimed through wear & tear instead), and totalled
 // separately as capital expenditure.
 

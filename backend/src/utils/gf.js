@@ -20,7 +20,7 @@ function extractToken(req) {
 function generateJwtToken(user) {
     // `role` is kept for backward compatibility this phase. Org context
     // (orgId/orgRole/platformRole) is added alongside it. orgId may be
-    // undefined for accounts not yet backfilled — authMiddleware treats a
+    // undefined for accounts not yet backfilled - authMiddleware treats a
     // missing orgId on a presented token as "re-login required" (401).
     return jwt.sign(
         {
@@ -40,7 +40,7 @@ async function hashPassword(password) {
 }
 
 // Excel export. `taxSummary` (optional, Phase 5) is the shape returned by
-// services/tax/taxSummaryService.buildTaxSummary — when present it marks
+// services/tax/taxSummaryService.buildTaxSummary - when present it marks
 // capital rows on the Expenses sheet and appends the tax-season sheets
 // (Tax summary / Capital allowances / VAT) the accountant re-keys today.
 const ASSET_TYPE_LABELS = {
@@ -69,7 +69,7 @@ const generateExcel = async (expenses, imagesDir, filePath, taxSummary = null) =
         { header: 'Merchant', key: 'merchant', width: 20 },
         { header: 'Tax', key: 'tax', width: 10 },
         { header: 'Capital', key: 'capital', width: 10 },
-        { header: 'Receipt Image URL', key: 'receipt_image_url', width: 20 },
+        { header: 'Receipt File', key: 'receipt_file', width: 26 },
         { header: 'Receipt Image', key: 'receipt_image', width: 20 },
     ];
     const IMAGE_COLUMN = 12; // keep in sync with the columns above
@@ -77,6 +77,13 @@ const generateExcel = async (expenses, imagesDir, filePath, taxSummary = null) =
     worksheet.getRow(1).font = { bold: true };
 
     expenses.forEach(expense => {
+        // Point at the copy shipped in the zip's images/ folder. Receipt
+        // objects are private (signed-URL access only), so a raw storage URL
+        // would be useless in a spreadsheet; legacy pre-Phase-2 rows that only
+        // hold an old public URL fall back to showing it.
+        const receiptFile = expense.local_image_path
+            ? `images/${path.basename(expense.local_image_path)}`
+            : (expense.receipt_image_url || '');
         worksheet.addRow({
             id: expense.id,
             title: expense.title,
@@ -88,7 +95,7 @@ const generateExcel = async (expenses, imagesDir, filePath, taxSummary = null) =
             merchant: expense.merchant_name || '',
             tax: expense.tax_amount ?? '',
             capital: capitalIds.has(expense.id) ? 'Yes' : '',
-            receipt_image_url: expense.receipt_image_url,
+            receipt_file: receiptFile,
             receipt_image: '',
         });
     });
@@ -121,7 +128,7 @@ const generateExcel = async (expenses, imagesDir, filePath, taxSummary = null) =
     await workbook.xlsx.writeFile(filePath);
 };
 
-// "Tax summary" — the year's totals in the Form 11 shape the accountant
+// "Tax summary" - the year's totals in the Form 11 shape the accountant
 // re-keys every January.
 function addTaxSummarySheet(workbook, summary) {
     const sheet = workbook.addWorksheet('Tax summary');
@@ -136,7 +143,7 @@ function addTaxSummarySheet(workbook, summary) {
     };
     const line = (label, value) => sheet.addRow({ label, value });
 
-    title(`${summary.orgName} — tax year ${summary.year}`);
+    title(`${summary.orgName} - tax year ${summary.year}`);
     sheet.addRow({});
     line('Income', summary.totals.income);
     line('Allowable expenses (revenue)', summary.totals.revenueExpenses);
@@ -148,7 +155,7 @@ function addTaxSummarySheet(workbook, summary) {
     net.font = { bold: true };
 
     sheet.addRow({});
-    title('Form 11 — extracts from accounts (revenue expenses)');
+    title('Form 11 - extracts from accounts (revenue expenses)');
     summary.form11.forEach((bucket) => line(bucket.label, bucket.total));
 
     sheet.addRow({});
@@ -159,7 +166,7 @@ function addTaxSummarySheet(workbook, summary) {
     sheet.getColumn(2).numFmt = '#,##0.00';
 }
 
-// "Capital allowances" — the wear & tear schedule (12.5% straight-line over 8
+// "Capital allowances" - the wear & tear schedule (12.5% straight-line over 8
 // years; car cost cap already applied in `allowableCost`).
 function addCapitalAllowancesSheet(workbook, summary) {
     const sheet = workbook.addWorksheet('Capital allowances');
@@ -207,7 +214,7 @@ function addCapitalAllowancesSheet(workbook, summary) {
     });
 }
 
-// "VAT" — the org's VAT position for the year.
+// "VAT" - the org's VAT position for the year.
 function addVatSheet(workbook, summary) {
     const sheet = workbook.addWorksheet('VAT');
     sheet.columns = [

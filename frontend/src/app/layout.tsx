@@ -14,7 +14,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: `${BRAND} — expense & receipt tracking`,
+    default: `${BRAND} - expense & receipt tracking`,
     template: `%s · ${BRAND}`,
   },
   description:

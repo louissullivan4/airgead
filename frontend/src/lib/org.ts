@@ -15,8 +15,8 @@ export interface OrgCategoryOption {
 /** Friendly business-type options for the signup/settings selects. */
 export const ORG_CATEGORIES: OrgCategoryOption[] = [
   { slug: "personal", label: "Personal" },
-  { slug: "sole_trader_equine", label: "Sole trader — Equine / Equestrian" },
-  { slug: "sole_trader_agriculture", label: "Sole trader — Agriculture / Farming" },
+  { slug: "sole_trader_equine", label: "Sole trader - Equine / Equestrian" },
+  { slug: "sole_trader_agriculture", label: "Sole trader - Agriculture / Farming" },
   { slug: "consultant", label: "Consultant / Professional services" },
   { slug: "retail", label: "Retail / Shop" },
   { slug: "trades_construction", label: "Trades & Construction" },
@@ -42,7 +42,7 @@ export const COUNTRIES: Country[] = [
 
 export const DEFAULT_COUNTRY = "IE";
 
-// Offline / failed-fetch fallback for the transaction form — mirrors the backend
+// Offline / failed-fetch fallback for the transaction form - mirrors the backend
 // DEFAULT_TEMPLATE so the form always has a usable set of categories.
 export const DEFAULT_CATEGORY_TREE: CategoryTree = {
   expense: [
@@ -100,7 +100,7 @@ export function firstLeafSlug(
 // --- Phase 5: capital-item suggestion + VAT status ---------------------------
 
 /**
- * Fallback for org trees stored before the `capital` node flag existed —
+ * Fallback for org trees stored before the `capital` node flag existed -
  * equipment-like leaves across the templates. The flag/set only drives a UI
  * suggestion (pre-ticking "Capital item"); the user always decides.
  */
@@ -129,7 +129,7 @@ export const VAT_STATUS_OPTIONS: { value: string; label: string; hint: string }[
   {
     value: "not_registered",
     label: "Not VAT registered",
-    hint: "Below the registration thresholds — VAT is simply part of your costs.",
+    hint: "Below the registration thresholds - VAT is simply part of your costs.",
   },
   {
     value: "registered",
@@ -139,7 +139,7 @@ export const VAT_STATUS_OPTIONS: { value: string; label: string; hint: string }[
   {
     value: "flat_rate_farmer",
     label: "Flat-rate farmer",
-    hint: "Unregistered farmer — you add the flat-rate % to sales instead of reclaiming VAT.",
+    hint: "Unregistered farmer - you add the flat-rate % to sales instead of reclaiming VAT.",
   },
 ];
 

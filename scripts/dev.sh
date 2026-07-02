@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 if (exec 3<>/dev/tcp/127.0.0.1/"${POSTGRES_PORT}") 2>/dev/null; then
   exec 3>&- 3<&- || true
-  echo "▶ Host port ${POSTGRES_PORT} is in use — exposing Postgres on 5433 instead."
+  echo "▶ Host port ${POSTGRES_PORT} is in use - exposing Postgres on 5433 instead."
   POSTGRES_PORT=5433
 fi
 export POSTGRES_PORT
@@ -54,7 +54,7 @@ cat <<'EOF'
      email:     demo@rian.dev
      password:  Password123!
 
-   (The frontend's first load compiles on demand — give it a few seconds.)
+   (The frontend's first load compiles on demand - give it a few seconds.)
 
    Logs:   docker compose logs -f
    Reseed: npm run seed   (or: docker compose exec backend npm run seed)

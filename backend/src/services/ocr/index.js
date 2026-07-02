@@ -21,7 +21,7 @@ const getOcrProvider = () => {
         case 'hosted':
             return new HostedOcrProvider();
         default:
-            logger.warn('Unknown OCR_PROVIDER "%s" — treating OCR as disabled.', provider);
+            logger.warn('Unknown OCR_PROVIDER "%s" - treating OCR as disabled.', provider);
             return null;
     }
 };

@@ -7,7 +7,7 @@
 //   - src/config/brand.js / lib/brand.ts (BRAND_LEGACY constant)
 //   - backend/migrations/*.sql          (historical migration comments)
 //   - infra / DB-name references        (Postgres DB name + URLs are out of
-//                                         scope for Phase 0 — see Task 0.3)
+//                                         scope for Phase 0 - see Task 0.3)
 //
 // Run from the repo root or backend/: `npm run check:brand`.
 
@@ -51,7 +51,7 @@ try {
     });
 } catch (e) {
     if (e.status === 1) {
-        console.log('check:brand — no references to the legacy name found.');
+        console.log('check:brand - no references to the legacy name found.');
         process.exit(0);
     }
     throw e;
@@ -66,11 +66,11 @@ const violations = matches
     });
 
 if (violations.length > 0) {
-    console.error('check:brand FAILED — legacy brand name found outside allowed locations:\n');
+    console.error('check:brand FAILED - legacy brand name found outside allowed locations:\n');
     console.error(violations.join('\n'));
     console.error(`\n${violations.length} disallowed reference(s). Replace with the BRAND constant or add to the allow-list in ${path.relative(repoRoot, __filename)} if intentional.`);
     process.exit(1);
 }
 
-console.log('check:brand — OK. Remaining references are all in allowed locations.');
+console.log('check:brand - OK. Remaining references are all in allowed locations.');
 process.exit(0);

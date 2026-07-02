@@ -1,16 +1,16 @@
 // VAT position for the tax summary, driven by `organisations.vat_status`:
 //
-//   'registered'       — normal VAT accounting: input VAT on purchases is
+//   'registered'       - normal VAT accounting: input VAT on purchases is
 //                        reclaimable; we total the captured `tax_amount`s.
-//   'not_registered'   — VAT is just a cost; totals shown for information.
-//   'flat_rate_farmer' — unregistered farmer on the flat-rate scheme: adds the
+//   'not_registered'   - VAT is just a cost; totals shown for information.
+//   'flat_rate_farmer' - unregistered farmer on the flat-rate scheme: adds the
 //                        flat-rate addition to sales to VAT-registered buyers
 //                        instead of reclaiming input VAT. May still reclaim VAT
 //                        on farm buildings/structures, fencing, land drainage
-//                        via the VAT 58 procedure — we total spend in
+//                        via the VAT 58 procedure - we total spend in
 //                        vat58-flagged categories as a prompt.
 //
-// Flat-rate addition by year (set each Budget — VERIFY against Revenue
+// Flat-rate addition by year (set each Budget - VERIFY against Revenue
 // annually; unknown years fall back to the latest known rate):
 const FLAT_RATE_ADDITION_BY_YEAR = {
     2023: 0.05,
@@ -29,7 +29,7 @@ const flatRateAdditionFor = (year) =>
     FLAT_RATE_ADDITION_BY_YEAR[year] ?? LATEST_KNOWN_FLAT_RATE;
 
 // Collect the vat58-flagged slugs from an org's category tree (plus the known
-// fallback set) — tolerant of trees without metadata.
+// fallback set) - tolerant of trees without metadata.
 const vat58Slugs = (tree) => {
     const slugs = new Set(KNOWN_VAT58_SLUGS);
     const walk = (nodes) =>
@@ -69,7 +69,7 @@ const vatSummary = ({ vatStatus, expenses, year, tree }) => {
         vatOnIncome: round2(vatOnIncome),
         // Flat-rate farmers: the % addition applied to sales to registered buyers.
         flatRateAddition: status === 'flat_rate_farmer' ? flatRateAdditionFor(year) : null,
-        // Prompt for the VAT 58 reclaim (farm buildings/fencing/drainage) —
+        // Prompt for the VAT 58 reclaim (farm buildings/fencing/drainage) -
         // relevant to unregistered/flat-rate farmers only; UI decides display.
         vat58EligibleSpend: round2(vat58EligibleSpend),
     };

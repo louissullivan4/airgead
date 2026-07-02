@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Camera, FileDown, Sparkles } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { BRAND } from "@/lib/brand";
@@ -12,7 +13,7 @@ const FEATURES = [
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
-      {/* Brand panel — desktop only */}
+      {/* Brand panel - desktop only */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex">
         <div
           aria-hidden
@@ -30,7 +31,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             Turn receipts into tax-ready records.
           </h2>
           <p className="mt-3 text-primary-foreground/80">
-            Expense tracking built for freelancers and sole traders — not accountants.
+            Expense tracking built for freelancers and sole traders - not accountants.
           </p>
           <ul className="mt-8 space-y-4">
             {FEATURES.map(({ icon: Icon, text }) => (
@@ -56,6 +57,15 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <Logo href="/" />
           </div>
           {children}
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            <Link href="/terms" className="hover:text-foreground hover:underline">
+              Terms
+            </Link>
+            {" · "}
+            <Link href="/privacy" className="hover:text-foreground hover:underline">
+              Privacy
+            </Link>
+          </p>
         </div>
       </div>
     </div>

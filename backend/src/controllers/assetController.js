@@ -4,7 +4,7 @@ const { isSuperAdmin } = require('../middlewares/tenantScope');
 const logger = require('../utils/logger');
 
 // Phase 5 asset register. All endpoints operate on the CALLER's org (the org is
-// the business entity; members' purchases roll up) — cross-org reads live on
+// the business entity; members' purchases roll up) - cross-org reads live on
 // the /accountant surface via the tax summary. Mutations are org-scoped through
 // the model's orgPredicate; super_admin bypasses (null orgId), matching the
 // expense/receipt convention.
@@ -17,7 +17,7 @@ const parseYear = (value) => {
     return Number.isInteger(year) && year > 1900 ? year : new Date().getFullYear();
 };
 
-// GET /assets?year= — the register plus the computed wear & tear schedule for
+// GET /assets?year= - the register plus the computed wear & tear schedule for
 // the (tax) year. Allowances are derived on demand, never stored.
 const listAssets = async (req, res) => {
     try {
@@ -30,7 +30,7 @@ const listAssets = async (req, res) => {
     }
 };
 
-// POST /assets — a standalone register entry (opening balance / pre-app
+// POST /assets - a standalone register entry (opening balance / pre-app
 // purchase; no linked expense). Capital items captured day-to-day come in
 // through the expense/receipt save instead.
 const createAsset = async (req, res) => {
@@ -64,7 +64,7 @@ const createAsset = async (req, res) => {
     }
 };
 
-// PATCH /assets/:id — edit details, record a disposal (date + proceeds), or
+// PATCH /assets/:id - edit details, record a disposal (date + proceeds), or
 // correct a cost. Org-scoped; 404 when out of scope.
 const updateAsset = async (req, res) => {
     try {
@@ -88,7 +88,7 @@ const updateAsset = async (req, res) => {
     }
 };
 
-// DELETE /assets/:id — remove from the register. A linked expense stays and
+// DELETE /assets/:id - remove from the register. A linked expense stays and
 // simply reverts to an ordinary revenue expense (the row's absence IS the
 // "not capital" state).
 const deleteAsset = async (req, res) => {

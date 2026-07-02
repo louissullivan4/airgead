@@ -2,7 +2,7 @@
 
 Expense tracking and ledger management.
 
-> Formerly "EquiLedger" — see `docs/rename-runbook.md` for the in-progress rename.
+> Formerly "EquiLedger" - see `docs/rename-runbook.md` for the in-progress rename.
 
 ## Structure
 
@@ -60,8 +60,8 @@ The backend exposes:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/users/login` | — | Login |
-| POST | `/users/signup` | — | Register |
+| POST | `/users/login` | - | Login |
+| POST | `/users/signup` | - | Register |
 | GET | `/users` | admin/accountant | List users |
 | GET | `/expenses/users/:id` | token | User expenses |
 | POST | `/expenses` | token | Create expense |

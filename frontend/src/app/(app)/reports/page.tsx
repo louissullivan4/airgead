@@ -81,7 +81,7 @@ export default function ReportsPage() {
       await api.assets.delete(target.id);
       toast.success("Removed from the register", {
         description: target.expense_id
-          ? "The original transaction stays — it now counts as a normal expense."
+          ? "The original transaction stays - it now counts as a normal expense."
           : undefined,
       });
       void load();

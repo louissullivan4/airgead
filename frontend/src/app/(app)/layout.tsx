@@ -6,6 +6,8 @@ import { useSession } from "@/lib/session";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav, MobileTopBar } from "@/components/mobile-nav";
 import { SupportDialog } from "@/components/support-dialog";
+import { TrialBanner } from "@/components/trial-banner";
+import { VerifyEmailBanner } from "@/components/verify-email-banner";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -56,7 +58,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <MobileTopBar name={name} email={email} onSupport={onSupport} />
 
       <main className="px-4 pb-24 pt-5 sm:px-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-9">
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          <VerifyEmailBanner profile={profile} />
+          <TrialBanner />
+          {children}
+        </div>
       </main>
 
       <MobileBottomNav onSupport={onSupport} />

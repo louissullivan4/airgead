@@ -1,6 +1,6 @@
 const logger = require('../utils/logger');
 
-// Phase 2 tenant scoping: receipts key on user_id only (no receipts.org_id —
+// Phase 2 tenant scoping: receipts key on user_id only (no receipts.org_id -
 // mirrors the expenses denormalisation choice in expenseModel.js). We enforce
 // isolation via the user -> org relationship: a row is in-scope when its user_id
 // belongs to the caller's org. Pass orgId = null/undefined to bypass scoping

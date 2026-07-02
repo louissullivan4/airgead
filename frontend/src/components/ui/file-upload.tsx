@@ -19,7 +19,7 @@ function FileUpload({
   value,
   onChange,
   accept = "image/*",
-  hint = "PNG or JPG — optional",
+  hint = "PNG or JPG - optional",
   className,
 }: FileUploadProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);

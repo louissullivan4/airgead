@@ -1,10 +1,10 @@
-# Phase 3 — Accountant ↔ Client workspace
+# Phase 3 - Accountant ↔ Client workspace
 
 This phase adds the relationship an accountancy practice needs: oversight of a
 client's **separate, isolated** organisation (read + export), without the
 accountant ever becoming a member of that org.
 
-> **Phase 3.1 update — firms with multiple accountants.** A practice can now be a
+> **Phase 3.1 update - firms with multiple accountants.** A practice can now be a
 > real firm: a self-serve "accountancy practice" signup creates a flagged firm
 > org whose signer is the **admin accountant** (org owner); the admin invites
 > **other accountants** (firm members); each accountant **owns the clients they
@@ -14,13 +14,13 @@ accountant ever becoming a member of that org.
 
 ## The three relationships (keep them distinct)
 
-1. **Accountant ↔ Client org** — *cross-org oversight* (new in Phase 3). An
+1. **Accountant ↔ Client org** - *cross-org oversight* (new in Phase 3). An
    explicit grant row in `accountant_org_links`, **not** membership. The client
    owns their own org; the accountant is granted read access to it.
-2. **Org admin ↔ Member** — *same-org membership* (pre-existing). An invited user
+2. **Org admin ↔ Member** - *same-org membership* (pre-existing). An invited user
    *joins the inviter's org* (`users.inviter_id`, `org_role='member'`, provisioned
    by `createUserWithOrg(mode='invite')`). Surfaced in the **Team** tab.
-3. **Member → expenses** — *data scoping* (pre-existing). Rows are in-scope when
+3. **Member → expenses** - *data scoping* (pre-existing). Rows are in-scope when
    their `user_id` belongs to the caller's org (`orgPredicate` in
    `expenseModel` / `receiptModel`).
 
@@ -53,7 +53,7 @@ becomes owner of a brand-new org) **and**, in the same transaction, inserts an
 
 ### Enabling a practice / firm
 
-**Phase 3.1:** self-serve at signup — choosing "This is an accountancy practice"
+**Phase 3.1:** self-serve at signup - choosing "This is an accountancy practice"
 sets `organisation.is_accountant_practice = true`; `createUserWithOrg` writes the
 flag (and forces `type='business'`), making the signer the firm **admin/owner**.
 The flag can still be flipped directly in the DB for existing orgs:
@@ -71,7 +71,7 @@ UPDATE organisations SET is_accountant_practice = true WHERE id = '<org-id>';
   admin via the existing owner-only `POST /organisations/:id/invite-member`.
   Because the firm org is flagged, members automatically get the Clients tab and
   may invite/own/revoke **their own** clients. They cannot see the Team tab.
-- **Client ownership** is `accountant_org_links.created_by` — the accountant who
+- **Client ownership** is `accountant_org_links.created_by` - the accountant who
   invited the client. **Reassignment** (admin-only) simply updates `created_by`.
 
 ## The accessible-set scoping rule (security-critical)
@@ -94,7 +94,7 @@ firm clients; a **member accountant** sees only clients where
 
 Cross-org access lives only in dedicated `/accountant/*` endpoints. The existing
 `/expenses`, `/receipts`, `/users`, `/organisations` routes stay scoped to the
-token's own org and are unchanged — single-org behaviour is identical.
+token's own org and are unchanged - single-org behaviour is identical.
 
 ## Endpoints
 

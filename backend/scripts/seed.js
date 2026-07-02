@@ -1,22 +1,22 @@
 /*
- * Local development seed.
+ * Local development seed (DEMO DATA).
  *
- * The production schema is not yet captured in the repo (see db/SCHEMA_REQUIRED.md
- * / docs/schema-capture.md), so a fresh local Postgres has no tables. This script
- * is a DEV-ONLY convenience: it creates a schema that matches what the app code
- * expects (including the Phase 0 org columns) and inserts a demo org + user +
- * sample transactions so you can log in and click around immediately.
+ * Since Phase 6, MIGRATIONS are the source of truth for the schema: on an
+ * empty database `npm run migrate:up` bootstraps everything (000_baseline
+ * creates the pre-migration core; 001-011 evolve it exactly as on prod).
+ * This script's SCHEMA_SQL is kept only as a belt-and-braces dev convenience
+ * (all IF NOT EXISTS - it never fights the migrations) so `npm run seed` on a
+ * blank container still works in one step.
  *
- * It is idempotent — re-running wipes and recreates the demo rows (identified by
- * fixed UUIDs) without touching anything else.
+ * What you actually run it for is the DEMO DATA: a personal demo account, an
+ * accountancy firm with two linked clients, and sample transactions. It is
+ * idempotent - re-running wipes and recreates the demo rows (fixed UUIDs)
+ * without touching anything else.
  *
  * Run it inside the backend container (bcrypt is guaranteed there):
  *     docker compose exec backend npm run seed
  * or from the host against the published port:
  *     DB_URL=postgres://postgres:postgres@localhost:5432/equiledger npm run seed
- *
- * NOTE: this schema is for local dev only. It is NOT the source of truth for the
- * production schema.
  */
 
 const { Pool } = require('pg');
@@ -41,10 +41,15 @@ CREATE TABLE IF NOT EXISTS organisations (
     is_accountant_practice boolean NOT NULL DEFAULT false,
     status                 text NOT NULL DEFAULT 'active',
     owner_account_id       uuid,
-    subscription_level     text,
+    subscription_level     text DEFAULT 'trial',
     renewal_date           date,
     is_auto_renew          boolean,
     payment_method         text,
+    -- Phase 6 billing: trial clock + Stripe linkage (see migrations/010_billing.sql)
+    trial_ends_at          timestamptz DEFAULT (now() + interval '30 days'),
+    stripe_customer_id     text,
+    stripe_subscription_id text,
+    billing_status         text NOT NULL DEFAULT 'none',
     created_at             timestamptz NOT NULL DEFAULT now(),
     updated_at             timestamptz NOT NULL DEFAULT now()
 );
@@ -54,6 +59,10 @@ ALTER TABLE organisations ADD COLUMN IF NOT EXISTS org_category text NOT NULL DE
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS is_accountant_practice boolean NOT NULL DEFAULT false;
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS vat_status text NOT NULL DEFAULT 'not_registered';
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz DEFAULT (now() + interval '30 days');
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS billing_status text NOT NULL DEFAULT 'none';
 
 CREATE TABLE IF NOT EXISTS users (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -88,9 +97,12 @@ CREATE TABLE IF NOT EXISTS users (
     org_id             uuid REFERENCES organisations(id),
     org_role           text DEFAULT 'owner' CHECK (org_role IN ('owner','member')),
     platform_role      text DEFAULT 'user' CHECK (platform_role IN ('user','super_admin')),
+    email_verified_at  timestamptz,
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS receipts (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -209,7 +221,7 @@ const ACCT_ORG_ID = '00000000-0000-0000-0000-0000000000a2';
 const ACCT_USER_ID = '00000000-0000-0000-0000-0000000000b2';
 const ACCT_EMAIL = 'accountant@rian.dev';
 
-// Staff accountant — a member of the firm above.
+// Staff accountant - a member of the firm above.
 const ACCT2_USER_ID = '00000000-0000-0000-0000-0000000000b5';
 const ACCT2_EMAIL = 'accountant2@rian.dev';
 
@@ -268,7 +280,7 @@ async function main() {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
     // Helpers (capture `client`/`passwordHash` from scope). Queries run
-    // sequentially — a single pg client can't execute concurrent queries.
+    // sequentially - a single pg client can't execute concurrent queries.
     const insertTx = async (userId, txns) => {
       for (const tx of txns) {
         const inserted = await client.query(
@@ -290,16 +302,18 @@ async function main() {
     };
 
     const insertOrgWithOwner = async (o) => {
+      // Demo orgs are seeded as paid-up ('standard'/'active') so the demo walk
+      // never trips trial banners or (post-GA-flip) the write gate.
       await client.query(
-        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice, vat_status)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
+        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice, vat_status, subscription_level, billing_status)
+         VALUES ($1,$2,$3,$4,$5,$6,'standard','active')`,
         [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice), o.vatStatus || 'not_registered'],
       );
       await client.query(
         `INSERT INTO users (
             id, fname, sname, email, currency, password_hash, role,
-            org_id, org_role, platform_role
-         ) VALUES ($1,$2,$3,$4,'EUR',$5,$6,$7,'owner',$8)`,
+            org_id, org_role, platform_role, email_verified_at
+         ) VALUES ($1,$2,$3,$4,'EUR',$5,$6,$7,'owner',$8,now())`,
         [o.userId, o.fname, o.sname, o.email, passwordHash, o.role, o.orgId, o.platformRole || 'user'],
       );
       await client.query('UPDATE organisations SET owner_account_id = $1 WHERE id = $2', [o.userId, o.orgId]);
@@ -323,7 +337,7 @@ async function main() {
     await client.query('DELETE FROM users WHERE id = ANY($1) OR email = ANY($2)', [allUserIds, allEmails]);
     await client.query('DELETE FROM organisations WHERE id = ANY($1)', [allOrgIds]);
 
-    // Original personal demo account — doubles as the platform super admin for now.
+    // Original personal demo account - doubles as the platform super admin for now.
     await insertOrgWithOwner({
       orgId: DEMO_ORG_ID, userId: DEMO_USER_ID, orgName: 'Demo Org', orgType: 'personal',
       orgCategory: 'personal', email: DEMO_EMAIL, fname: 'Demo', sname: 'User',
@@ -337,12 +351,12 @@ async function main() {
       orgCategory: 'consultant', email: ACCT_EMAIL, fname: 'Áine', sname: 'Kelly', role: 'accountant', isPractice: true,
     });
 
-    // Staff accountant — a MEMBER of the firm (org_role 'member').
+    // Staff accountant - a MEMBER of the firm (org_role 'member').
     await client.query(
       `INSERT INTO users (
           id, fname, sname, email, currency, password_hash, role,
-          org_id, org_role, platform_role
-       ) VALUES ($1,'Cathal','Walsh',$2,'EUR',$3,'accountant',$4,'member','user')`,
+          org_id, org_role, platform_role, email_verified_at
+       ) VALUES ($1,'Cathal','Walsh',$2,'EUR',$3,'accountant',$4,'member','user',now())`,
       [ACCT2_USER_ID, ACCT2_EMAIL, passwordHash, ACCT_ORG_ID],
     );
 
@@ -366,14 +380,14 @@ async function main() {
 
     console.log('\n✅ Seeded demo data');
     console.log(`   Personal demo: ${DEMO_TX.length} transactions for ${DEMO_EMAIL}`);
-    console.log('   Accountancy firm "Rian Accountancy" — admin + staff accountant:');
+    console.log('   Accountancy firm "Rian Accountancy" - admin + staff accountant:');
     DEMO_CLIENTS.forEach((c) =>
       console.log(
         `     • ${c.orgName} (${c.tx.length} txns) → owned by ${c.ownerUserId === ACCT_USER_ID ? 'admin' : 'staff'}`,
       ),
     );
     console.log(`\n   All accounts share the password: ${DEMO_PASSWORD}`);
-    console.log('\n   Super admin (whole-platform Admin dashboard) — also the personal demo user:');
+    console.log('\n   Super admin (whole-platform Admin dashboard) - also the personal demo user:');
     console.log(`     email:    ${DEMO_EMAIL}`);
     console.log('   Admin accountant (sees BOTH clients, manages the team, can reassign):');
     console.log(`     email:    ${ACCT_EMAIL}`);

@@ -89,7 +89,7 @@ jobs:
   # ── Build & push images (main only) ───────────────────────────────────────
 
   docker-backend:
-    name: Docker — Backend
+    name: Docker - Backend
     if: github.event_name == 'push'
     needs: [lint, test, build-frontend]
     runs-on: ubuntu-latest
@@ -115,7 +115,7 @@ jobs:
           cache-to: type=gha,scope=backend,mode=max
 
   docker-frontend:
-    name: Docker — Frontend
+    name: Docker - Frontend
     if: github.event_name == 'push'
     needs: [lint, test, build-frontend]
     runs-on: ubuntu-latest

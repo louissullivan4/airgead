@@ -6,7 +6,7 @@ const parseYear = (value) => {
     return Number.isInteger(year) && year > 1900 ? year : new Date().getFullYear();
 };
 
-// GET /reports/tax-summary?year= — the caller's own org, always (the org id
+// GET /reports/tax-summary?year= - the caller's own org, always (the org id
 // comes from the token, never the request; the accountant's cross-org view
 // lives on /accountant/clients/:id/tax-summary behind assertClientAccess).
 const getTaxSummary = async (req, res) => {

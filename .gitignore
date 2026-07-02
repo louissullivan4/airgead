@@ -56,3 +56,5 @@ frontend/public/swe-worker-*.js
 
 # Misc
 *.pem
+
+.claude/**

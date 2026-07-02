@@ -42,7 +42,7 @@ interface AssetDialogProps {
 
 /**
  * Add or edit an asset-register entry. Editing an asset that came from an
- * expense keeps the expense untouched — only the register row changes. The
+ * expense keeps the expense untouched - only the register row changes. The
  * disposal fields stop wear & tear from the disposal year.
  */
 function AssetDialog({ open, onOpenChange, asset, onSaved }: AssetDialogProps) {
@@ -123,7 +123,7 @@ function AssetDialog({ open, onOpenChange, asset, onSaved }: AssetDialogProps) {
           <DialogTitle>{editing ? "Edit asset" : "Add asset"}</DialogTitle>
           <DialogDescription>
             {editing
-              ? "Update the register entry — allowances recompute automatically."
+              ? "Update the register entry - allowances recompute automatically."
               : "An opening asset (bought before you started capturing here). Day-to-day purchases are better captured as transactions marked “Capital item”."}
           </DialogDescription>
         </DialogHeader>

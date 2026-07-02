@@ -6,11 +6,11 @@ const logger = require('../utils/logger');
 //
 // What gets STORED is a normal, legible image: the original photo, auto-oriented,
 // size-bounded, and re-encoded to a compressed JPEG. Image formats are already
-// "compress on store / decompress on view" — any viewer or browser decompresses
+// "compress on store / decompress on view" - any viewer or browser decompresses
 // the JPEG transparently on download, so the user sees the real receipt.
 //
 // NOTE: we intentionally do NOT store a binarised (1-bit black/white) image.
-// Binarisation is destructive — it permanently discards the grey detail — so it
+// Binarisation is destructive - it permanently discards the grey detail - so it
 // is only ever used as a throwaway input for OCR (see `binarise` below), never
 // as the thing we keep and serve back to the user.
 
@@ -23,7 +23,7 @@ const JPEG_QUALITY = 85;
 const DEFAULT_THRESHOLD = 140;
 
 // TODO: perspective crop (OpenCV findContours + warpPerspective, or a Python
-// sidecar) — deferred to avoid a finicky native dependency on the node:20-alpine
+// sidecar) - deferred to avoid a finicky native dependency on the node:20-alpine
 // image. When added, detect the largest 4-point convex receipt contour and
 // deskew; if no confident quad is found, pass the full frame through unchanged
 // (a missed crop beats one that cuts off the total). Until then this is a no-op
@@ -33,7 +33,7 @@ const cropReceipt = async (buffer) => {
 };
 
 // Compress the captured photo to a legible, size-bounded JPEG for storage.
-// `.rotate()` (no args) auto-orients from EXIF — important for phone captures.
+// `.rotate()` (no args) auto-orients from EXIF - important for phone captures.
 const compress = async (buffer) => {
     return sharp(buffer)
         .rotate()
@@ -42,7 +42,7 @@ const compress = async (buffer) => {
         .toBuffer();
 };
 
-// Grayscale + threshold to a 1-bit black/white PNG. DESTRUCTIVE — for OCR input
+// Grayscale + threshold to a 1-bit black/white PNG. DESTRUCTIVE - for OCR input
 // only (dormant today); never stored as the user-facing receipt.
 const binarise = async (buffer, threshold = DEFAULT_THRESHOLD) => {
     return sharp(buffer)

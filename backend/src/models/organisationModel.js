@@ -13,7 +13,7 @@ const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 't
 //   - 'invite' : join the inviter's existing org as a member.
 //
 // Phase 3: a CLIENT invite is a 'self' signup (the client gets their own,
-// isolated org) PLUS `accountantOrgId` set — in which case we also write an
+// isolated org) PLUS `accountantOrgId` set - in which case we also write an
 // *active* accountant_org_links row in the same transaction so the inviting
 // practice gains read access. The accountant never joins the client org.
 // `createdBy` is the inviting accountant's user id (from the signed invite
@@ -23,7 +23,11 @@ const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 't
 // `user` carries the already-validated profile fields (password is the bcrypt
 // hash). Returns the created users row (RETURNING *), including org_id/org_role/
 // platform_role so a token can be issued from it.
-const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId, createdBy }) => {
+//
+// `emailVerified` (Phase 6): invite-token signups arrive BY email, so the
+// address is proven and stamped at creation; self-serve signups start null and
+// verify via the emailed link (userController).
+const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId, createdBy, emailVerified }) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -57,7 +61,7 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
             // Self-serve accountancy firm signup: flags the org so it unlocks the
             // Clients workspace and may invite clients. A firm is always a
             // business. (Phase 3 kept this flag DB-only; Phase 3.1 lets a firm
-            // self-provision at signup — the signer becomes the admin/owner.)
+            // self-provision at signup - the signer becomes the admin/owner.)
             const isPractice = Boolean(provided && provided.is_accountant_practice === true);
 
             // A non-personal category (or a firm) implies a business; else
@@ -95,9 +99,10 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
                 fname, mname, sname, email, phone_number, date_of_birth, ppsno,
                 address_line1, address_line2, city, county, country, tax_status,
                 marital_status, postal_code, occupation, currency, password_hash,
-                inviter_id, id_image_url, org_id, org_role, platform_role
+                inviter_id, id_image_url, org_id, org_role, platform_role,
+                email_verified_at
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
             ) RETURNING *`,
             [
                 user.fname,
@@ -123,6 +128,7 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
                 orgId,
                 orgRole,
                 'user',
+                emailVerified ? new Date() : null,
             ]
         );
 

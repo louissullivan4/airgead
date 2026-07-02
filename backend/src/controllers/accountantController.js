@@ -9,6 +9,7 @@ const { isSuperAdmin } = require('../middlewares/tenantScope');
 const { sendInviteEmail } = require('./userController');
 const { downloadImages, createZipArchive } = require('../middlewares/imageDownload');
 const { buildTaxSummary } = require('../services/tax/taxSummaryService');
+const seatSync = require('../services/billing/seatSync');
 const gf = require('../utils/gf');
 const logger = require('../utils/logger');
 
@@ -75,7 +76,7 @@ const inviteClient = async (req, res) => {
     }
 };
 
-// GET /accountant/clients — linked client orgs with this-tax-year summary stats.
+// GET /accountant/clients - linked client orgs with this-tax-year summary stats.
 // Admins/super_admins see all firm clients; member accountants see only theirs.
 const listClients = async (req, res) => {
     try {
@@ -89,7 +90,7 @@ const listClients = async (req, res) => {
     }
 };
 
-// GET /accountant/clients/:clientOrgId/transactions — that client's line items.
+// GET /accountant/clients/:clientOrgId/transactions - that client's line items.
 // ?year= optionally narrows to a tax year; omitted = all.
 const getClientTransactions = async (req, res) => {
     try {
@@ -184,7 +185,7 @@ const exportClient = async (req, res) => {
     }
 };
 
-// GET /accountant/clients/:clientOrgId/tax-summary?year= — the client's full
+// GET /accountant/clients/:clientOrgId/tax-summary?year= - the client's full
 // tax picture (Form 11 buckets, capital allowances, VAT position). Same link
 // gate as every other client read.
 const getClientTaxSummary = async (req, res) => {
@@ -204,7 +205,7 @@ const getClientTaxSummary = async (req, res) => {
     }
 };
 
-// DELETE /accountant/clients/:clientOrgId/link — revoke access (status='revoked').
+// DELETE /accountant/clients/:clientOrgId/link - revoke access (status='revoked').
 // A member accountant may revoke only their own client; the admin any firm client.
 const revokeClient = async (req, res) => {
     try {
@@ -214,6 +215,9 @@ const revokeClient = async (req, res) => {
             ? (req.body && req.body.accountantOrgId) || req.user.orgId
             : req.user.orgId;
         await accountantLinkModel.revokeLink(req.pool, accountantOrgId, clientOrgId);
+        // One fewer active seat - sync the practice's Stripe quantity.
+        // Best-effort: never throws, no-ops when Stripe is unconfigured.
+        await seatSync.syncPracticeSeats(req.pool, accountantOrgId);
         res.status(200).json({ message: 'Client access revoked.' });
     } catch (error) {
         logger.error('Error revoking client access: %s', error.message);
@@ -221,7 +225,7 @@ const revokeClient = async (req, res) => {
     }
 };
 
-// PATCH /accountant/clients/:clientOrgId/assign — reassign a client to another
+// PATCH /accountant/clients/:clientOrgId/assign - reassign a client to another
 // accountant in the firm. Admin-only (requireOrgRole('owner') on the route;
 // super_admin bypasses). The target must be a member of the firm org.
 const reassignClient = async (req, res) => {

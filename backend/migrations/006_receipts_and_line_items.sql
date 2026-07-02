@@ -4,11 +4,11 @@
 -- photographed receipt can produce MANY expense rows (1 receipt -> N expenses).
 -- Previously `expenses.receipt_image_url` tied a single image to a single
 -- expense. This migration is ADDITIVE, idempotent, and reversible. It does NOT
--- migrate or rewrite existing `expenses` rows — old rows keep working through
+-- migrate or rewrite existing `expenses` rows - old rows keep working through
 -- `receipt_image_url` (kept for backward compatibility) with a null `receipt_id`.
 --
 -- `receipts.image_object_path` stores the storage OBJECT KEY (e.g.
--- "org_<id>/2026/<receiptId>.png"), never a public URL — reads go through
+-- "org_<id>/2026/<receiptId>.png"), never a public URL - reads go through
 -- short-lived signed URLs (see storage.js / signedUrl.js).
 --
 -- `parsed_data`/`ocr_confidence` are reserved for the future (currently dormant)
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS receipts (
     updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
--- Expense line items reference the receipt they were captured from. Nullable —
+-- Expense line items reference the receipt they were captured from. Nullable -
 -- manual expenses with no photo (and all pre-existing rows) carry no receipt_id.
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_id uuid;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS merchant_name text;

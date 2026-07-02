@@ -35,7 +35,7 @@ const makeClient = () => {
 
 const callMatching = (client, re) => client.query.getCalls().find((c) => re.test(c.args[0]));
 
-describe('Phase 3 — accountant ↔ client provisioning (createUserWithOrg)', () => {
+describe('Phase 3 - accountant ↔ client provisioning (createUserWithOrg)', () => {
     afterEach(() => sinon.restore());
 
     it('client invite creates a SEPARATE org + an ACTIVE link, owner not member', async () => {
@@ -82,7 +82,7 @@ describe('Phase 3 — accountant ↔ client provisioning (createUserWithOrg)', (
     });
 });
 
-describe('Phase 3 — accountant client access control', () => {
+describe('Phase 3 - accountant client access control', () => {
     afterEach(() => sinon.restore());
 
     const reqFor = (clientOrgId, platformRole = 'user') => ({
@@ -159,7 +159,7 @@ describe('Phase 3 — accountant client access control', () => {
     });
 });
 
-describe('Phase 3.1 — firm signup flag', () => {
+describe('Phase 3.1 - firm signup flag', () => {
     afterEach(() => sinon.restore());
 
     const orgInsertParams = (client) =>
@@ -197,7 +197,7 @@ describe('Phase 3.1 — firm signup flag', () => {
     });
 });
 
-describe('Phase 3.1 — per-accountant ownership', () => {
+describe('Phase 3.1 - per-accountant ownership', () => {
     afterEach(() => sinon.restore());
 
     const reqFor = (overrides) => ({
@@ -258,7 +258,7 @@ describe('Phase 3.1 — per-accountant ownership', () => {
     });
 });
 
-describe('Phase 3.1 — client reassignment', () => {
+describe('Phase 3.1 - client reassignment', () => {
     afterEach(() => sinon.restore());
 
     const reqFor = (overrides) => ({

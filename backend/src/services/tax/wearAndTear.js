@@ -1,4 +1,4 @@
-// Irish capital allowances — wear & tear on plant & machinery (TCA 1997 s.284).
+// Irish capital allowances - wear & tear on plant & machinery (TCA 1997 s.284).
 //
 // The rules encoded here (verify against Revenue after each Budget):
 //   - 12.5% straight-line per year over 8 years.
@@ -7,14 +7,14 @@
 //     pro-rating for income tax).
 //   - Passenger cars (`asset_type='motor_vehicle'`): allowable cost is capped
 //     at the "specified amount" of €24,000. Lorries, tractors, horseboxes,
-//     trailers etc. are `plant_machinery` — uncapped. (The CO₂-emissions
+//     trailers etc. are `plant_machinery` - uncapped. (The CO₂-emissions
 //     banding that can halve/deny the car cap is deliberately out of scope in
 //     v1 and documented as such.)
 //   - No wear & tear from the year of disposal onward. Balancing allowances /
-//     charges on disposal are out of scope in v1 — the register records
+//     charges on disposal are out of scope in v1 - the register records
 //     disposal date + proceeds so the accountant can compute them.
 //
-// Everything here is a PURE function of the asset rows and a tax year —
+// Everything here is a PURE function of the asset rows and a tax year -
 // allowances are computed on demand, never stored, so there is no schedule
 // state to drift.
 
@@ -56,7 +56,7 @@ const allowanceForYear = (asset, year) => {
     return annual;
 };
 
-// Accumulated allowances up to (and excluding) `year` — drives the written-down
+// Accumulated allowances up to (and excluding) `year` - drives the written-down
 // value columns. At most 8 small iterations per asset.
 const accumulatedTo = (asset, year) => {
     const acquiredYear = yearOf(asset.acquired_date);

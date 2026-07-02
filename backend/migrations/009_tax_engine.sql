@@ -3,13 +3,13 @@
 -- Phase 5 / Irish tax engine: capital allowances + VAT treatment.
 --
 -- `assets` is the capital-asset register. An expense is a CAPITAL item iff an
--- assets row references it (no flag column on expenses — one source of truth).
+-- assets row references it (no flag column on expenses - one source of truth).
 -- Deleting the source expense cascades the asset; removing the asset row
 -- reverts the expense to an ordinary revenue expense. Standalone register
 -- entries (expense_id NULL) cover opening balances / pre-app purchases.
 --
 -- Wear & tear is COMPUTED (12.5% straight-line over 8 years, €24k cap for
--- passenger cars — see services/tax/wearAndTear.js), never stored, so there is
+-- passenger cars - see services/tax/wearAndTear.js), never stored, so there is
 -- no schedule state to drift.
 --
 -- `organisations.vat_status` drives the VAT section of the tax summary:

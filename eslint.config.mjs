@@ -21,6 +21,20 @@ export default [
       "no-underscore-dangle": "off",
     },
   },
+  {
+    // ESM scripts (e.g. backend/scripts/e2e-phase6.mjs) run under node too.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      sourceType: "module",
+      ecmaVersion: 2022,
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      "no-console": "off",
+    },
+  },
   pluginJs.configs.recommended,
   {
     // Allow intentionally-unused names prefixed with `_` (e.g. the `next` arg

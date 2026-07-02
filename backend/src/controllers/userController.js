@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 const userModel = require('../models/userModel');
 const organisationModel = require('../models/organisationModel');
+const seatSync = require('../services/billing/seatSync');
 const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
@@ -39,6 +40,40 @@ const sendInviteEmail = async (email, inviteLink) => {
     };
 
     await transporter.sendMail(mailOptions);
+};
+
+// Phase 6 email verification. Self-serve signups must confirm their address
+// via a signed 24h link; anyone who arrived through an invite token already
+// proved the address (the invite landed in it) and is stamped at creation.
+// Enforcement (the login block after the grace window) is skippable with
+// REQUIRE_EMAIL_VERIFICATION=false for dev.
+const VERIFY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+const requireEmailVerification = () => process.env.REQUIRE_EMAIL_VERIFICATION !== 'false';
+
+const sendVerificationEmail = async (email) => {
+    const verifyToken = jwt.sign({ email, kind: 'verify' }, jwtSecret, { expiresIn: '24h' });
+    // The link hits the BACKEND (which stamps and then bounces to the login
+    // page), so it is built from the backend's public URL, not FRONTEND_URL.
+    const backendBase = (process.env.PUBLIC_BACKEND_URL || `http://localhost:${process.env.PORT || 8080}`).replace(/\/$/, '');
+    const verifyLink = `${backendBase}/users/verify-email?token=${verifyToken}`;
+
+    const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.EMAIL_USERNAME,
+            pass: process.env.EMAIL_PASSWORD,
+        },
+    });
+
+    await transporter.sendMail({
+        from: process.env.EMAIL_USERNAME,
+        to: email,
+        subject: `Verify your ${BRAND} email address`,
+        text: `Welcome to ${BRAND}! Please confirm your email address by clicking this link (valid for 24 hours): ${verifyLink}\n\nIf the link expires, you can request a new one from the app.`,
+    });
 };
 
 const createUser = async (req, res) => {
@@ -269,6 +304,23 @@ const login = async (req, res) => {
             return res.status(403).json({ error: 'This organisation has been suspended. Please contact support.' });
         }
 
+        // Phase 6: self-serve accounts must verify their address, with a
+        // 7-day grace window so day-one friction stays zero. Invite arrivals
+        // were stamped verified at creation and never hit this.
+        if (requireEmailVerification() && !user.email_verified_at) {
+            const createdAt = user.created_at ? new Date(user.created_at).getTime() : NaN;
+            // An unparseable/missing created_at counts as WITHIN grace -
+            // missing data must never lock someone out of their books.
+            const withinGrace = !Number.isFinite(createdAt) || Date.now() - createdAt <= VERIFY_GRACE_MS;
+            if (!withinGrace) {
+                logger.warn('Login blocked for unverified email: %s', email);
+                return res.status(403).json({
+                    error: 'Please verify your email address to continue - check your inbox for the link, or request a new one.',
+                    code: 'email_unverified',
+                });
+            }
+        }
+
         const token = gf.generateJwtToken(user);
 
         logger.info('User logged in successfully: ', {
@@ -383,13 +435,35 @@ const register = async (req, res) => {
         }
 
         const passwordHash = await gf.hashPassword(password);
+        // Arriving through ANY signed invite token proves the address (the
+        // token reached that inbox); only genuinely self-serve signups need
+        // the verification loop.
+        const emailVerified = Boolean(token);
         const newUser = await organisationModel.createUserWithOrg(req.pool, {
             user: { ...req.body, password: passwordHash },
             mode,
             inviterId,
             accountantOrgId,
             createdBy,
+            emailVerified,
         });
+
+        if (!emailVerified && requireEmailVerification()) {
+            // Best-effort: a mail hiccup must not fail the signup - the user
+            // can resend from the banner, and the 7-day grace keeps them in.
+            try {
+                await sendVerificationEmail(email);
+            } catch (mailError) {
+                logger.warn('Verification email failed for %s: %s', email, mailError.message);
+            }
+        }
+
+        // A new client seat changes what the inviting practice pays: sync its
+        // Stripe quantity AFTER the signup transaction committed. Best-effort -
+        // syncPracticeSeats never throws and no-ops when Stripe is unconfigured.
+        if (accountantOrgId) {
+            await seatSync.syncPracticeSeats(req.pool, accountantOrgId);
+        }
 
         const newToken = gf.generateJwtToken(newUser);
         logger.info('Account registered: %s (%s)', email, mode);
@@ -498,7 +572,7 @@ const resetPassword = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await userModel.updatePassword(req.pool, user.email, hashedPassword);
+        await userModel.updateUserPassword(req.pool, user.email, hashedPassword);
 
         logger.info('Password reset successfully for user: %s', user.email);
         res.status(200).json({ message: 'Password reset successfully.' });
@@ -615,6 +689,52 @@ const sendSupportEmail = async (req, res) => {
     }
   };
 
+// GET /users/verify-email?token= - the link from the verification email.
+// A browser click, not an API call: respond with redirects to the login page
+// (?verified=1 on success, ?verified=expired on a bad/old token so the page
+// can offer a resend).
+const verifyEmail = async (req, res) => {
+    const { token } = req.query;
+    const loginUrl = `${frontendURL || ''}/login`;
+    try {
+        const decoded = jwt.verify(token, jwtSecret);
+        if (decoded.kind !== 'verify' || !decoded.email) {
+            throw new Error('not a verification token');
+        }
+        await userModel.setEmailVerifiedByEmail(req.pool, decoded.email);
+        logger.info('Email verified: %s', decoded.email);
+        return res.redirect(`${loginUrl}?verified=1`);
+    } catch (error) {
+        logger.warn('Email verification failed: %s', error.message);
+        return res.redirect(`${loginUrl}?verified=expired`);
+    }
+};
+
+// POST /users/resend-verification { email } - strict-rate-limited in
+// src/index.js. Answers identically whether or not the account exists (no
+// user enumeration).
+const resendVerification = async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required.' });
+    }
+    try {
+        const user = await userModel.getUserByEmail(req.pool, email);
+        if (user && !user.email_verified_at) {
+            try {
+                await sendVerificationEmail(email);
+                logger.info('Verification email re-sent to %s', email);
+            } catch (mailError) {
+                logger.warn('Resend verification failed for %s: %s', email, mailError.message);
+            }
+        }
+        return res.status(200).json({ message: 'If that address needs verification, a new link is on its way.' });
+    } catch (error) {
+        logger.error('Error resending verification: %s', error.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
 module.exports = {
     createUser,
     getAllUsers,
@@ -632,4 +752,6 @@ module.exports = {
     getAssignedUsers,
     sendSupportEmail,
     sendInviteEmail,
+    verifyEmail,
+    resendVerification,
 };

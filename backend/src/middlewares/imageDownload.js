@@ -18,39 +18,53 @@ const toObjectPath = (stored) => {
     return stored;
 };
 
+// Where an expense's receipt image lives, if anywhere. Phase 2 camera
+// captures store it on the linked receipts row (receipt_object_path, exposed
+// by the expense SELECTs); pre-Phase-2 rows carry the legacy
+// expenses.receipt_image_url column. Prefer the receipts row - it is the
+// canonical current location.
+const imageSourceOf = (expense) => expense.receipt_object_path || expense.receipt_image_url || null;
+
 const downloadImages = async (expenses, imagesDir) => {
     await fs.ensureDir(imagesDir);
 
-    const downloadPromises = expenses
-        .filter(expense => expense.receipt_image_url)
-        .map(async (expense) => {
-            const objectPath = toObjectPath(expense.receipt_image_url);
+    // Several line items can share ONE receipt (multi-line capture): download
+    // each object once and point every sharing expense at the same file.
+    const downloadedByObjectPath = new Map();
 
-            const imageExtension = path.extname(objectPath) || '.jpg';
-            const imageName = `expense_${expense.id}${imageExtension}`;
-            const imagePath = path.join(imagesDir, imageName);
+    const downloadPromises = expenses
+        .filter((expense) => imageSourceOf(expense))
+        .map(async (expense) => {
+            const objectPath = toObjectPath(imageSourceOf(expense));
+
+            if (!downloadedByObjectPath.has(objectPath)) {
+                downloadedByObjectPath.set(objectPath, (async () => {
+                    const imageExtension = path.extname(objectPath) || '.jpg';
+                    const imageName = `expense_${expense.id}${imageExtension}`;
+                    const imagePath = path.join(imagesDir, imageName);
+
+                    const exists = await storage.exists(objectPath);
+                    if (!exists) {
+                        logger.warn(`Receipt ${objectPath} does not exist in storage.`);
+                        return null;
+                    }
+
+                    const readStream = storage.createReadStream(objectPath);
+                    await fs.ensureDir(path.dirname(imagePath));
+                    const writeStream = fs.createWriteStream(imagePath);
+
+                    await new Promise((resolve, reject) => {
+                        readStream.pipe(writeStream)
+                            .on('finish', resolve)
+                            .on('error', reject);
+                    });
+
+                    return imagePath;
+                })());
+            }
 
             try {
-                const exists = await storage.exists(objectPath);
-                if (!exists) {
-                    logger.warn(`Receipt ${objectPath} does not exist in storage.`);
-                    expense.local_image_path = null;
-                    return;
-                }
-
-                const readStream = storage.createReadStream(objectPath);
-
-                await fs.ensureDir(path.dirname(imagePath));
-
-                const writeStream = fs.createWriteStream(imagePath);
-
-                await new Promise((resolve, reject) => {
-                    readStream.pipe(writeStream)
-                        .on('finish', resolve)
-                        .on('error', reject);
-                });
-
-                expense.local_image_path = imagePath;
+                expense.local_image_path = await downloadedByObjectPath.get(objectPath);
             } catch (error) {
                 logger.warn(`Failed to download image for expense ID ${expense.id}: ${error.message}`);
                 expense.local_image_path = null;

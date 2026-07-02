@@ -65,7 +65,7 @@ describe('buildTaxSummary', () => {
 describe('GET /reports/tax-summary (own org only)', () => {
     afterEach(() => sinon.restore());
 
-    it("always reports on the TOKEN's org — a query param cannot redirect it", async () => {
+    it("always reports on the TOKEN's org - a query param cannot redirect it", async () => {
         const getOrg = sinon.stub(organisationModel, 'getOrgById').resolves({
             id: 'org-A', name: 'Own Org', org_category: 'personal', vat_status: 'not_registered', categories: null,
         });

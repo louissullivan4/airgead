@@ -9,6 +9,7 @@ import { COUNTRIES, ORG_CATEGORIES, VAT_STATUS_OPTIONS } from "@/lib/org";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { OrgCategoriesEditor } from "@/components/org-categories-editor";
+import { BillingCard } from "@/components/billing-card";
 import {
   Card,
   CardContent,
@@ -17,7 +18,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -358,21 +358,25 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <Badge>{profile?.subscription_level ?? "Free"}</Badge>
-          <span className="text-sm text-muted-foreground">{"You're on the Free plan."}</span>
-        </CardContent>
-      </Card>
+      <BillingCard isOwner={!!isOwner} />
 
       <Card>
         <CardHeader>
           <CardTitle>Account</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Records are kept while your account is active - Irish Revenue requires keeping tax
+            records for 6 years. Export before deleting anything you still need. See the{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Privacy Policy
+            </a>
+            .
+          </p>
           <Button
             variant="outline"
             onClick={handleLogout}
