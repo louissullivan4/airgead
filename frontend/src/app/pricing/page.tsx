@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 const FAQS = [
   {
-    q: "My accountant uses rian - do I pay?",
+    q: "My accountant uses airgead - do I pay?",
     a: "No. When your accountant's practice invited you, your seat is covered by the practice. You pay nothing.",
   },
   {
@@ -63,7 +63,7 @@ function PlanCard({
           </li>
         ))}
       </ul>
-      <Button asChild size="lg" className="mt-8 w-full" variant={highlight ? "primary" : "outline"}>
+      <Button asChild size="lg" className="mt-8 w-full" vaairgeadt={highlight ? "primary" : "outline"}>
         <Link href="/signup">
           {cta} <ArrowRight />
         </Link>
@@ -79,7 +79,7 @@ export default function PricingPage() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5">
           <Logo href="/" />
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild vaairgeadt="ghost" size="sm">
               <Link href="/login">Log in</Link>
             </Button>
             <Button asChild size="sm">

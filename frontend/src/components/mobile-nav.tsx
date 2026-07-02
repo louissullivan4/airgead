@@ -25,7 +25,7 @@ function MobileTopBar({ name, email, onSupport }: MobileChromeProps) {
         name={name}
         email={email}
         onSupport={onSupport}
-        variant="avatar"
+        vaairgeadt="avatar"
         side="bottom"
         align="end"
       />

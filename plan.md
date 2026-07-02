@@ -100,4 +100,4 @@ Phase 4 - Super-admin platform dashboard [DONE - see docs/phase-4-super-admin.md
 [DONE] Type-selectable invite (regular user vs accountant→firm) via platform invite token.
 [DONE] Suspend/reactivate users + orgs (migration 008 organisations.status; users.account_status), enforced at login.
 [DONE] GDPR hard-delete cascades (org + user) incl. stored receipt images (storage.deleteObject); self-target + owner-with-members guards.
-[DONE] Frontend Admin dashboard + nav gating; drill into any org via the read-only client-detail view. Seed adds super@rian.dev.
+[DONE] Frontend Admin dashboard + nav gating; drill into any org via the read-only client-detail view. Seed adds super@airgead.dev.

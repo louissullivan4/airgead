@@ -178,7 +178,7 @@ export default function HomePage() {
         <Card className="lg:col-span-3">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Recent activity</CardTitle>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild vaairgeadt="ghost" size="sm">
               <Link href="/transactions">View all</Link>
             </Button>
           </CardHeader>

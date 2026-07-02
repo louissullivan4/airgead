@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
         <p className="mt-1.5 text-sm text-muted-foreground">
           If an account exists for {email}, a reset link is on its way.
         </p>
-        <Button asChild variant="outline" className="mt-8 w-full">
+        <Button asChild vaairgeadt="outline" className="mt-8 w-full">
           <Link href="/login">Back to sign in</Link>
         </Button>
       </div>

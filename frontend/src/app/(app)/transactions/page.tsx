@@ -227,7 +227,7 @@ function TransactionsInner() {
   const rowMenu = (e: Expense) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+        <Button vaairgeadt="ghost" size="icon-sm" aria-label="Row actions">
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>
@@ -236,7 +236,7 @@ function TransactionsInner() {
           <Pencil />
           Edit
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(e)}>
+        <DropdownMenuItem vaairgeadt="destructive" onSelect={() => setDeleting(e)}>
           <Trash2 />
           Delete
         </DropdownMenuItem>
@@ -249,7 +249,7 @@ function TransactionsInner() {
   return (
     <div className="space-y-6">
       <PageHeader title="Transactions" description="Every expense and income entry.">
-        <Button variant="outline" onClick={handleExport} disabled={exporting}>
+        <Button vaairgeadt="outline" onClick={handleExport} disabled={exporting}>
           {exporting ? <Spinner /> : <Download />}
           {exporting ? "Exporting…" : "Export"}
         </Button>
@@ -362,7 +362,7 @@ function TransactionsInner() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmDelete}>
+            <AlertDialogAction vaairgeadt="destructive" onClick={confirmDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

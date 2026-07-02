@@ -67,7 +67,7 @@ describe('POST /billing/checkout-session', () => {
             checkout: { sessions: { create: sessions } },
         });
         sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', name: 'Rian Accountancy', is_accountant_practice: true, stripe_customer_id: 'cus_existing',
+            id: 'org-1', name: 'Airgead Accountancy', is_accountant_practice: true, stripe_customer_id: 'cus_existing',
         });
         sinon.stub(billingModel, 'countActiveSeats').resolves(7);
 

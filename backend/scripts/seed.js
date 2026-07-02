@@ -27,7 +27,7 @@ const DB_URL =
 
 const DEMO_ORG_ID = '00000000-0000-0000-0000-0000000000a1';
 const DEMO_USER_ID = '00000000-0000-0000-0000-0000000000b1';
-const DEMO_EMAIL = 'demo@rian.dev';
+const DEMO_EMAIL = 'demo@airgead.dev';
 const DEMO_PASSWORD = 'Password123!';
 
 const SCHEMA_SQL = `
@@ -219,11 +219,11 @@ const DEMO_TX = [
 // admin shows both clients; as the staff accountant shows only Murphy Retail.
 const ACCT_ORG_ID = '00000000-0000-0000-0000-0000000000a2';
 const ACCT_USER_ID = '00000000-0000-0000-0000-0000000000b2';
-const ACCT_EMAIL = 'accountant@rian.dev';
+const ACCT_EMAIL = 'accountant@airgead.dev';
 
 // Staff accountant - a member of the firm above.
 const ACCT2_USER_ID = '00000000-0000-0000-0000-0000000000b5';
-const ACCT2_EMAIL = 'accountant2@rian.dev';
+const ACCT2_EMAIL = 'accountant2@airgead.dev';
 
 const DEMO_CLIENTS = [
   {
@@ -231,7 +231,7 @@ const DEMO_CLIENTS = [
     userId: '00000000-0000-0000-0000-0000000000b3',
     orgName: 'Galway Equine',
     orgCategory: 'sole_trader_equine',
-    email: 'client1@rian.dev',
+    email: 'client1@airgead.dev',
     fname: 'Aoife',
     sname: 'Byrne',
     ownerUserId: ACCT_USER_ID, // owned by the admin accountant
@@ -255,7 +255,7 @@ const DEMO_CLIENTS = [
     userId: '00000000-0000-0000-0000-0000000000b4',
     orgName: 'Murphy Retail',
     orgCategory: 'retail',
-    email: 'client2@rian.dev',
+    email: 'client2@airgead.dev',
     fname: 'Sean',
     sname: 'Murphy',
     ownerUserId: ACCT2_USER_ID, // owned by the staff accountant
@@ -347,7 +347,7 @@ async function main() {
 
     // Accountant practice (flagged) + its admin (owner) accountant.
     await insertOrgWithOwner({
-      orgId: ACCT_ORG_ID, userId: ACCT_USER_ID, orgName: 'Rian Accountancy', orgType: 'business',
+      orgId: ACCT_ORG_ID, userId: ACCT_USER_ID, orgName: 'Airgead Accountancy', orgType: 'business',
       orgCategory: 'consultant', email: ACCT_EMAIL, fname: 'Áine', sname: 'Kelly', role: 'accountant', isPractice: true,
     });
 
@@ -380,7 +380,7 @@ async function main() {
 
     console.log('\n✅ Seeded demo data');
     console.log(`   Personal demo: ${DEMO_TX.length} transactions for ${DEMO_EMAIL}`);
-    console.log('   Accountancy firm "Rian Accountancy" - admin + staff accountant:');
+    console.log('   Accountancy firm "Airgead Accountancy" - admin + staff accountant:');
     DEMO_CLIENTS.forEach((c) =>
       console.log(
         `     • ${c.orgName} (${c.tx.length} txns) → owned by ${c.ownerUserId === ACCT_USER_ID ? 'admin' : 'staff'}`,

@@ -1,4 +1,4 @@
-// API client for the rian web app.
+// API client for the airgead web app.
 //
 // Auth is handled by a Next.js BFF: the JWT lives in an httpOnly cookie that the
 // browser never reads. All backend calls go same-origin through `/api/proxy/*`

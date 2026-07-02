@@ -248,4 +248,4 @@ where noted), registered in `src/index.js`. Tests: Jest + sinon, fully mocked
 pool/models - no live DB. Frontend: all calls through `lib/api.ts` →
 `/api/proxy/*`; shadcn/Radix/Tailwind; nav gating via props from
 `app/(app)/layout.tsx`. Dev commands run inside WSL:
-`wsl -d Ubuntu -e bash -lc 'cd /home/stew/code/rian/... && …'`.
+`wsl -d Ubuntu -e bash -lc 'cd /home/stew/code/airgead/... && …'`.

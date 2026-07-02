@@ -158,7 +158,7 @@ export function OrgCategoriesEditor({
             {canEdit && (
               <Button
                 type="button"
-                variant="ghost"
+                vaairgeadt="ghost"
                 size="icon-sm"
                 onClick={() => deleteCategory(side, i)}
                 aria-label="Delete category"
@@ -179,7 +179,7 @@ export function OrgCategoriesEditor({
                 {canEdit && (
                   <Button
                     type="button"
-                    variant="ghost"
+                    vaairgeadt="ghost"
                     size="icon-sm"
                     onClick={() => deleteSub(side, i, j)}
                     aria-label="Delete subcategory"
@@ -190,7 +190,7 @@ export function OrgCategoriesEditor({
               </div>
             ))}
             {canEdit && (
-              <Button type="button" variant="link" size="sm" className="px-0" onClick={() => addSub(side, i)}>
+              <Button type="button" vaairgeadt="link" size="sm" className="px-0" onClick={() => addSub(side, i)}>
                 <Plus /> Add subcategory
               </Button>
             )}
@@ -198,7 +198,7 @@ export function OrgCategoriesEditor({
         </div>
       ))}
       {canEdit && (
-        <Button type="button" variant="outline" size="sm" onClick={() => addCategory(side)}>
+        <Button type="button" vaairgeadt="outline" size="sm" onClick={() => addCategory(side)}>
           <Plus /> Add category
         </Button>
       )}
@@ -217,7 +217,7 @@ export function OrgCategoriesEditor({
             {saving && <Spinner />}
             {saving ? "Saving…" : "Save categories"}
           </Button>
-          <Button type="button" variant="outline" onClick={resetToDefaults} disabled={saving}>
+          <Button type="button" vaairgeadt="outline" onClick={resetToDefaults} disabled={saving}>
             <RotateCcw /> Reset to defaults
           </Button>
         </div>

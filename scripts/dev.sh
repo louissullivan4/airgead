@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Bring up the full rian stack locally (Postgres + backend + frontend) and seed
+# Bring up the full airgead stack locally (Postgres + backend + frontend) and seed
 # demo data, ready for manual testing. Safe to re-run.
 #
 #   npm run local           # from the repo root
@@ -45,13 +45,13 @@ docker compose exec -T backend npm run seed
 cat <<'EOF'
 
 ────────────────────────────────────────────────────────
-✅ rian is running
+✅ airgead is running
 
    Frontend:  http://localhost:3000
    Backend:   http://localhost:8080
 
    Demo login:
-     email:     demo@rian.dev
+     email:     demo@airgead.dev
      password:  Password123!
 
    (The frontend's first load compiles on demand - give it a few seconds.)

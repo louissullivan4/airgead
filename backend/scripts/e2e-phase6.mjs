@@ -21,7 +21,7 @@ const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 
 const BASE = process.env.BASE || 'http://localhost:58080';
-const DB_URL = process.env.DB_URL || 'postgres://postgres:postgres@localhost:55432/rian_test';
+const DB_URL = process.env.DB_URL || 'postgres://postgres:postgres@localhost:55432/airgead_test';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('Set JWT_SECRET to the same value the server booted with.');
@@ -70,7 +70,7 @@ const health = await req('/health');
 ok(health.status === 200 && health.json?.status === 'ok', '/health is 200 ok');
 
 // --- 1. practice entitlement ------------------------------------------------
-const acct = await login('accountant@rian.dev');
+const acct = await login('accountant@airgead.dev');
 const acctBill = await req('/billing/status', { token: acct });
 ok(acctBill.json?.enforced === true, 'billing is ENFORCED for this drive');
 ok(acctBill.json?.active === true && acctBill.json?.reason === 'practice', 'practice org is always active', acctBill.json?.reason);
@@ -79,7 +79,7 @@ ok(acctBill.json?.seatCount === 2, 'practice sees its 2 active client seats', `g
 // --- 2. covered seat --------------------------------------------------------
 // Seed marks every demo org as its own subscriber; make Galway rely on COVER.
 await setBilling('Galway Equine', 'none', -5); // own trial expired, no own billing
-const client = await login('client1@rian.dev');
+const client = await login('client1@airgead.dev');
 const covered = await req('/billing/status', { token: client });
 ok(covered.json?.active === true && covered.json?.reason === 'covered_seat',
   'client of a paying practice is a covered seat', covered.json?.reason);
@@ -90,7 +90,7 @@ const coveredWrite = await req('/expenses', {
 ok(coveredWrite.status === 201, 'covered seat can write');
 
 // --- 3. cover collapses when the practice stops paying ----------------------
-await setBilling('Rian Accountancy', 'canceled', -5);
+await setBilling('Airgead Accountancy', 'canceled', -5);
 const blockedWrite = await req('/expenses', {
   method: 'POST', token: client,
   body: { title: 'Should be blocked', category: 'feed_bedding', amount: 10, currency: 'EUR' },
@@ -107,7 +107,7 @@ ok(statusWhileExpired.status === 200 && statusWhileExpired.json?.active === fals
   'billing/status reports the expiry (so the banner can speak)', statusWhileExpired.json?.status);
 
 // --- 4. restore the practice -> cover returns -------------------------------
-await setBilling('Rian Accountancy', 'active', 25);
+await setBilling('Airgead Accountancy', 'active', 25);
 const restoredWrite = await req('/expenses', {
   method: 'POST', token: client,
   body: { title: 'Cover restored', category: 'feed_bedding', amount: 10, currency: 'EUR' },
@@ -117,7 +117,7 @@ ok(restoredWrite.status === 201, 'restoring the practice restores the seat');
 // --- 5. solo org lifecycle (uses the from-empty smoke user if present) ------
 const soloRow = await pool.query("SELECT o.id FROM organisations o WHERE o.name = 'Smoke Farm'");
 if (soloRow.rows[0]) {
-  const solo = await login('smoke@rian.dev');
+  const solo = await login('smoke@airgead.dev');
   await setBilling('Smoke Farm', 'none', -3);
   const soloBlocked = await req('/expenses', {
     method: 'POST', token: solo,
@@ -135,7 +135,7 @@ if (soloRow.rows[0]) {
 }
 
 // --- 6. super_admin bypasses the gate ---------------------------------------
-const admin = await login('demo@rian.dev');
+const admin = await login('demo@airgead.dev');
 await setBilling('Demo Org', 'none', -3);
 const adminWrite = await req('/expenses', {
   method: 'POST', token: admin,
@@ -155,7 +155,7 @@ const noSig = await req('/billing/webhook', { method: 'POST', body: JSON.stringi
 ok(noSig.status === 400, 'webhook without a signature header is rejected 400');
 
 // --- 8. email verification lifecycle -----------------------------------------
-const vEmail = `verify-drive-${Date.now()}@rian.dev`;
+const vEmail = `verify-drive-${Date.now()}@airgead.dev`;
 const reg = await req('/users/register', {
   method: 'POST',
   body: { fname: 'Verify', sname: 'Drive', email: vEmail, password: 'Password123!', currency: 'EUR' },

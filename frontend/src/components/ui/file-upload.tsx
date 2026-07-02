@@ -44,7 +44,7 @@ function FileUpload({
         <div className="min-w-0 flex-1 text-sm text-muted-foreground">Receipt attached</div>
         <Button
           type="button"
-          variant="ghost"
+          vaairgeadt="ghost"
           size="icon-sm"
           onClick={() => onChange(undefined)}
           aria-label="Remove receipt"

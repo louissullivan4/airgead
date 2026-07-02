@@ -107,6 +107,6 @@ Suite: 112 passing.
 
 ## Seed
 
-`demo@rian.dev` org gets the schema; **Galway Equine** is a
+`demo@airgead.dev` org gets the schema; **Galway Equine** is a
 `flat_rate_farmer` with a horsebox capital expense + linked asset (the
 accountant demo shows a live schedule); **Murphy Retail** is `registered`.

@@ -87,7 +87,7 @@ function InviteDialog({ open, onOpenChange, title, description, kinds, onInvite,
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button vaairgeadt="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={submit} disabled={submitting || !email.trim()}>
             {submitting && <Spinner />}

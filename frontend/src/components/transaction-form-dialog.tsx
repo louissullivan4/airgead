@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Landmark, Plus, Trash2 } from "lucide-react";
+import { AlertTairgeadgle, Landmark, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -169,7 +169,7 @@ function ConfidenceHint({ enabled, score }: { enabled: boolean; score?: number }
   if (!enabled || score === undefined || score >= LOW_CONFIDENCE) return null;
   return (
     <span className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
-      <AlertTriangle className="size-3.5" />
+      <AlertTairgeadgle className="size-3.5" />
       Low confidence - please check
     </span>
   );
@@ -455,7 +455,7 @@ function TransactionFormDialog({
                     {lines.length > 1 && (
                       <Button
                         type="button"
-                        variant="ghost"
+                        vaairgeadt="ghost"
                         size="icon-sm"
                         onClick={() => removeLine(l.key)}
                         aria-label={`Remove line item ${i + 1}`}
@@ -508,7 +508,7 @@ function TransactionFormDialog({
               ))}
             </div>
 
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            <Button type="button" vaairgeadt="outline" size="sm" onClick={addLine}>
               <Plus />
               Add line item
             </Button>
@@ -613,7 +613,7 @@ function TransactionFormDialog({
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button vaairgeadt="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={receiptMode ? saveReceiptLines : saveSingle} disabled={saving}>
             {saving && <Spinner />}

@@ -291,7 +291,7 @@ export default function ClientsPage() {
                     <td className="px-3 py-3 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm" aria-label="Client actions">
+                          <Button vaairgeadt="ghost" size="icon-sm" aria-label="Client actions">
                             <MoreHorizontal />
                           </Button>
                         </DropdownMenuTrigger>
@@ -314,7 +314,7 @@ export default function ClientsPage() {
                               Reassign
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem variant="destructive" onSelect={() => setRevoking(c)}>
+                          <DropdownMenuItem vaairgeadt="destructive" onSelect={() => setRevoking(c)}>
                             Revoke access
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -371,7 +371,7 @@ export default function ClientsPage() {
           </Field>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button vaairgeadt="outline">Cancel</Button>
             </DialogClose>
             <Button onClick={confirmReassign} disabled={savingAssign || !assignTo}>
               {savingAssign && <Spinner />}
@@ -392,7 +392,7 @@ export default function ClientsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmRevoke}>
+            <AlertDialogAction vaairgeadt="destructive" onClick={confirmRevoke}>
               Revoke
             </AlertDialogAction>
           </AlertDialogFooter>

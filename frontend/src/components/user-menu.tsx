@@ -30,7 +30,7 @@ interface UserMenuProps {
   onSupport: () => void;
   align?: "start" | "end";
   side?: "top" | "bottom" | "right";
-  variant?: "full" | "avatar";
+  vaairgeadt?: "full" | "avatar";
 }
 
 function UserMenu({
@@ -39,7 +39,7 @@ function UserMenu({
   onSupport,
   align = "start",
   side = "top",
-  variant = "full",
+  vaairgeadt = "full",
 }: UserMenuProps) {
   const router = useRouter();
   const { canInstall, promptInstall } = useInstallPrompt();
@@ -50,7 +50,7 @@ function UserMenu({
   }
 
   const trigger =
-    variant === "full" ? (
+    vaairgeadt === "full" ? (
       <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">
         <Avatar className="size-8">
           <AvatarFallback>{initials(name, email)}</AvatarFallback>
@@ -95,7 +95,7 @@ function UserMenu({
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={() => logout()}>
+        <DropdownMenuItem vaairgeadt="destructive" onSelect={() => logout()}>
           <LogOut />
           Log out
         </DropdownMenuItem>

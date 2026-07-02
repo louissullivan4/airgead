@@ -105,7 +105,7 @@ function SupportDialog({ open, onOpenChange, userEmail }: SupportDialogProps) {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button vaairgeadt="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={submit} disabled={submitting || !email || !description.trim()}>
             {submitting && <Spinner />}

@@ -23,7 +23,7 @@ function LegalShell({
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5">
           <Logo href="/" />
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild vaairgeadt="ghost" size="sm">
               <Link href="/login">Log in</Link>
             </Button>
             <Button asChild size="sm">
@@ -37,7 +37,7 @@ function LegalShell({
         <article className="mx-auto w-full max-w-3xl px-5">
           <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">Last updated: {updated}</p>
-          <div className="prose-rian mt-8 space-y-6 text-sm leading-6 text-foreground/90 [&_h2]:mt-10 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5 [&_table]:w-full [&_table]:text-left [&_th]:py-2 [&_th]:pr-4 [&_td]:border-t [&_td]:border-border [&_td]:py-2 [&_td]:pr-4">
+          <div className="prose-airgead mt-8 space-y-6 text-sm leading-6 text-foreground/90 [&_h2]:mt-10 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5 [&_table]:w-full [&_table]:text-left [&_th]:py-2 [&_th]:pr-4 [&_td]:border-t [&_td]:border-border [&_td]:py-2 [&_td]:pr-4">
             {children}
           </div>
         </article>

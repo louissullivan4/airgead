@@ -14,7 +14,7 @@ export default function OfflinePage() {
       </div>
       <h1 className="text-2xl font-semibold tracking-tight">You&apos;re offline</h1>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        rian needs a connection to load your transactions. Check your network and try again.
+        airgead needs a connection to load your transactions. Check your network and try again.
       </p>
       <Button asChild className="mt-6">
         <Link href="/home">Try again</Link>

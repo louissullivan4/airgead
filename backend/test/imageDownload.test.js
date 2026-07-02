@@ -19,7 +19,7 @@ describe('downloadImages', () => {
     let imagesDir;
 
     beforeEach(async () => {
-        imagesDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rian-imgdl-'));
+        imagesDir = await fs.mkdtemp(path.join(os.tmpdir(), 'airgead-imgdl-'));
     });
 
     afterEach(async () => {

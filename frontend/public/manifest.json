@@ -1,6 +1,6 @@
 {
-  "name": "rian - expense & receipt tracking",
-  "short_name": "rian",
+  "name": "airgead - expense & receipt tracking",
+  "short_name": "airgead",
   "description": "Snap receipts, auto-categorize expenses, and export tax-ready records.",
   "id": "/",
   "start_url": "/home",

@@ -222,7 +222,7 @@ function AssetDialog({ open, onOpenChange, asset, onSaved }: AssetDialogProps) {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button vaairgeadt="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Spinner />}

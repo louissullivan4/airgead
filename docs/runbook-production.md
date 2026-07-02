@@ -1,6 +1,6 @@
 # Production runbook
 
-Operational reference for running rian in production: environment matrix,
+Operational reference for running airgead in production: environment matrix,
 deploy checklist, backup/restore, billing webhooks, and incident basics.
 Written for the founder-operator; assumes managed Postgres + a container host
 (Cloud Run / Railway / Fly) + the Next.js frontend on its own host.
@@ -80,9 +80,9 @@ run it in prod.
 - **Primary**: the managed-Postgres provider's point-in-time recovery.
   Confirm it is enabled and retention ≥ 7 days.
 - **Belt and braces** (before risky changes, or scheduled):
-  `pg_dump --format=custom --no-owner "$DB_URL" > rian-$(date +%F).dump`
+  `pg_dump --format=custom --no-owner "$DB_URL" > airgead-$(date +%F).dump`
 - **Restore** to a NEW database, verify, then repoint `DB_URL`:
-  `pg_restore --no-owner --dbname "$NEW_DB_URL" rian-YYYY-MM-DD.dump`
+  `pg_restore --no-owner --dbname "$NEW_DB_URL" airgead-YYYY-MM-DD.dump`
 - Receipt images live in GCS (or local disk in dev), not the DB - GCS
   versioning/soft-delete is the image backup story. A DB restore does not
   touch images; orphaned image paths are harmless.

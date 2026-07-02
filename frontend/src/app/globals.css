@@ -3,7 +3,7 @@
 
 /* Class-based dark mode. Tokens for dark are authored below but not shipped as
    the default yet - add `class="dark"` on <html> to enable. */
-@custom-variant dark (&:is(.dark *));
+@custom-vaairgeadt dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
    Design tokens. Semantic CSS vars in :root / .dark, mapped into Tailwind's

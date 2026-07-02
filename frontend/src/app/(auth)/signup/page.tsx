@@ -153,7 +153,7 @@ function SignupForm() {
               </div>
               <Button
                 type="button"
-                variant="outline"
+                vaairgeadt="outline"
                 size="sm"
                 onClick={() => setShowOrg((v) => !v)}
               >
