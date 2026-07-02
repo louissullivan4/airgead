@@ -86,12 +86,24 @@ jobs:
         run: cd frontend && npm ci
       - run: cd frontend && npm run build
 
+  brand:
+    name: Brand & rename guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+      # Legacy-name check + rename-corruption guard (glued "airgead"). Pure
+      # node + git grep, so no install step is needed.
+      - run: npm run check:brand --workspace=backend
+
   # ── Build & push images (main only) ───────────────────────────────────────
 
   docker-backend:
     name: Docker - Backend
     if: github.event_name == 'push'
-    needs: [lint, test, build-frontend]
+    needs: [lint, test, build-frontend, brand]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -117,7 +129,7 @@ jobs:
   docker-frontend:
     name: Docker - Frontend
     if: github.event_name == 'push'
-    needs: [lint, test, build-frontend]
+    needs: [lint, test, build-frontend, brand]
     runs-on: ubuntu-latest
     permissions:
       contents: read

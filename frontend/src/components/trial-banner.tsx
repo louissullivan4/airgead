@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTairgeadgle, Clock } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import { api, type BillingStatus } from "@/lib/api";
 
 const WARN_DAYS = 7;
@@ -52,7 +52,7 @@ function TrialBanner() {
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
-      <AlertTairgeadgle className="size-4 shrink-0 text-destructive" />
+      <AlertTriangle className="size-4 shrink-0 text-destructive" />
       <span>
         Your trial has ended - your records are safe and always viewable, but adding new ones is
         paused.

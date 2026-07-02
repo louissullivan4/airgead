@@ -15,7 +15,7 @@ export interface OrgCategoryOption {
 /** Friendly business-type options for the signup/settings selects. */
 export const ORG_CATEGORIES: OrgCategoryOption[] = [
   { slug: "personal", label: "Personal" },
-  { slug: "sole_trader_equine", label: "Sole trader - Equine / Equestairgead" },
+  { slug: "sole_trader_equine", label: "Sole trader - Equine / Equestrian" },
   { slug: "sole_trader_agriculture", label: "Sole trader - Agriculture / Farming" },
   { slug: "consultant", label: "Consultant / Professional services" },
   { slug: "retail", label: "Retail / Shop" },

@@ -1,11 +1,11 @@
 import * as React from "react";
-import { cva, type VaairgeadtProps } from "class-vaairgeadce-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVaairgeadts = cva(
+const badgeVariants = cva(
   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
   {
-    vaairgeadts: {
+    variants: {
       variant: {
         default: "bg-primary/10 text-primary ring-primary/20",
         secondary: "bg-muted text-muted-foreground ring-border",
@@ -14,16 +14,16 @@ const badgeVaairgeadts = cva(
         outline: "text-foreground ring-border",
       },
     },
-    defaultVaairgeadts: { variant: "default" },
+    defaultVariants: { variant: "default" },
   },
 );
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VaairgeadtProps<typeof badgeVaairgeadts> {}
+    VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVaairgeadts({ variant }), className)} {...props} />;
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-export { Badge, badgeVaairgeadts };
+export { Badge, badgeVariants };

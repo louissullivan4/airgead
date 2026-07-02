@@ -752,7 +752,7 @@ authoritative for *operations*; this document owns *infrastructure & CI/CD*.
 | Secret Manager / logging | low volume | 1–5 |
 | **Total** | | **~120–180** |
 
-Cheapest viable vaairgeadt: `min-instances=0` + `ZONAL` Cloud SQL + Cloud Run
+Cheapest viable variant: `min-instances=0` + `ZONAL` Cloud SQL + Cloud Run
 domain mappings instead of the LB → **~€35–60/mo**, at the cost of cold starts
 and no edge WAF.
 

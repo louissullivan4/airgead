@@ -16,6 +16,8 @@ const withRequestId = format((info) => {
 
 const logger = createLogger({
     level: 'silly',
+    // Keep jest output readable: suppress all log lines under the test runner.
+    silent: process.env.NODE_ENV === 'test',
     format: format.combine(
         withRequestId(),
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),

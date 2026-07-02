@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTairgeadgle, Landmark, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Landmark, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -169,7 +169,7 @@ function ConfidenceHint({ enabled, score }: { enabled: boolean; score?: number }
   if (!enabled || score === undefined || score >= LOW_CONFIDENCE) return null;
   return (
     <span className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
-      <AlertTairgeadgle className="size-3.5" />
+      <AlertTriangle className="size-3.5" />
       Low confidence - please check
     </span>
   );
