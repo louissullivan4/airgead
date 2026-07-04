@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TOKEN_COOKIE, AUTH_PATHS } from "@/lib/constants";
+import { TOKEN_COOKIE, AUTH_PATHS, PUBLIC_PATHS } from "@/lib/constants";
 
 // Route guard: unauthenticated users may see the public landing page ("/") and
 // the auth pages; everything else redirects to /login. Authenticated users
@@ -13,11 +13,15 @@ export function middleware(req: NextRequest) {
   );
   // The marketing landing page at "/" is publicly accessible.
   const isLanding = pathname === "/";
+  // Marketing/legal pages (pricing, terms, privacy) are public in any auth state.
+  const isPublic = PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 
   // The offline fallback must be reachable by anyone, in any auth state.
   if (pathname === "/offline") return NextResponse.next();
 
-  if (!hasToken && !isAuthPath && !isLanding) {
+  if (!hasToken && !isAuthPath && !isLanding && !isPublic) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

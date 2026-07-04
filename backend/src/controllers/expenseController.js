@@ -390,7 +390,7 @@ const getExcelDownloadByUserIdAndYear = async (req, res) => {
 
         const expenses = await expenseModel.getExpensesByUserIdAndYear(pool, userId, year, scopeOrgIdFor(req));
         if (expenses.length === 0) {
-            return res.status(404).json({ message: 'No expenses found for the given user and year.' });
+            return res.status(404).json({ error: 'No expenses found for the given user and year.' });
         }
 
         await downloadImages(expenses, imagesDir);

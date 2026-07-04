@@ -1,7 +1,6 @@
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
 require('dotenv').config();
 const userModel = require('../models/userModel');
 const organisationModel = require('../models/organisationModel');
@@ -11,35 +10,44 @@ const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
 const gf = require('../utils/gf');
+const { sendEmail } = require('../utils/email');
 const { BRAND } = require('../config/brand');
 const { isSuperAdmin } = require('../middlewares/tenantScope');
 
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
 
-// Shared invite email sender for both invite kinds (member + client). Keeps the
-// Gmail transport config in one place. Throws on send failure so callers decide
-// how to respond.
+// Password strength policy, mirrored by the signup form's live checklist.
+// Client-side rules are bypassable with a direct API call, so the endpoints
+// that set a password (register, reset) are the real enforcement point.
+const PASSWORD_RULES = [
+    { label: 'at least 8 characters', test: (pw) => pw.length >= 8 },
+    { label: 'a lowercase letter', test: (pw) => /[a-z]/.test(pw) },
+    { label: 'an uppercase letter', test: (pw) => /[A-Z]/.test(pw) },
+    { label: 'a number', test: (pw) => /[0-9]/.test(pw) },
+    { label: 'a symbol', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+];
+const passwordPolicyError = (password) => {
+    const unmet = PASSWORD_RULES.filter((rule) => !rule.test(String(password ?? '')));
+    if (unmet.length === 0) return null;
+    return `Password must contain ${unmet.map((rule) => rule.label).join(', ')}.`;
+};
+
+// Shared invite email sender for both invite kinds (member + client). All
+// formatting/transport lives in utils/email so every mail matches the app
+// theme. Throws on send failure so callers decide how to respond.
 const sendInviteEmail = async (email, inviteLink) => {
-    const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-        },
-    });
-
-    const mailOptions = {
-        from: process.env.EMAIL_USERNAME,
+    await sendEmail({
         to: email,
-        subject: 'You have been invited to create an account!',
+        subject: `You've been invited to join ${BRAND}`,
+        heading: "You're invited",
+        paragraphs: [
+            `You have been invited to create an account with ${BRAND} - a simple way to track expenses and stay on top of your books.`,
+        ],
+        cta: { label: 'Create your account', url: inviteLink },
+        footerNote: 'You received this because someone invited this address to their organisation.',
         text: `You have been invited to create an account with ${BRAND}. Click the link to create your account: ${inviteLink}`,
-    };
-
-    await transporter.sendMail(mailOptions);
+    });
 };
 
 // Phase 6 email verification. Self-serve signups must confirm their address
@@ -57,21 +65,16 @@ const sendVerificationEmail = async (email) => {
     const backendBase = (process.env.PUBLIC_BACKEND_URL || `http://localhost:${process.env.PORT || 8080}`).replace(/\/$/, '');
     const verifyLink = `${backendBase}/users/verify-email?token=${verifyToken}`;
 
-    const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-            user: process.env.EMAIL_USERNAME,
-            pass: process.env.EMAIL_PASSWORD,
-        },
-    });
-
-    await transporter.sendMail({
-        from: process.env.EMAIL_USERNAME,
+    await sendEmail({
         to: email,
         subject: `Verify your ${BRAND} email address`,
+        heading: 'Confirm your email address',
+        paragraphs: [
+            `Welcome to ${BRAND}! Please confirm your email address to finish setting up your account.`,
+            'The link is valid for 24 hours - if it expires, you can request a new one from the app.',
+        ],
+        cta: { label: 'Verify email address', url: verifyLink },
+        footerNote: `You received this because this address was used to sign up to ${BRAND}.`,
         text: `Welcome to ${BRAND}! Please confirm your email address by clicking this link (valid for 24 hours): ${verifyLink}\n\nIf the link expires, you can request a new one from the app.`,
     });
 };
@@ -395,6 +398,12 @@ const register = async (req, res) => {
         });
     }
 
+    const passwordError = passwordPolicyError(password);
+    if (passwordError) {
+        logger.warn('Registration rejected for weak password: %s', email);
+        return res.status(400).json({ error: passwordError });
+    }
+
     let mode = 'self';
     let inviterId = null;
     let accountantOrgId = null;
@@ -523,37 +532,38 @@ const dashboardLogin = async (req, res) => {
     }
 };
 
+// Answers 200 with the same message whether or not the account exists - a 404
+// here would let anyone probe which emails have accounts (matches the
+// enumeration-safe contract of resend-verification).
 const requestPasswordReset = async (req, res) => {
     const { email } = req.body;
+    const genericMessage = 'If an account exists for that address, a reset link is on its way.';
 
     try {
         const user = await userModel.getUserByEmail(req.pool, email);
         if (!user) {
             logger.warn('Password reset requested for non-existing user: %s', email);
-            return res.status(404).json({ error: 'User not found.' });
+            return res.status(200).json({ message: genericMessage });
         }
 
         const resetToken = jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: '1h' });
 
         const resetLink = `${frontendURL}/reset-password?token=${resetToken}`;
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USERNAME,
-                pass: process.env.EMAIL_PASSWORD,
-            },
-        });
-        const mailOptions = {
-            from: process.env.EMAIL_USERNAME,
+        await sendEmail({
             to: email,
-            subject: 'Password Reset',
+            subject: `Reset your ${BRAND} password`,
+            heading: 'Reset your password',
+            paragraphs: [
+                `We received a request to reset the password for your ${BRAND} account.`,
+                'The link is valid for 1 hour. If you did not request this, you can safely ignore this email.',
+            ],
+            cta: { label: 'Reset password', url: resetLink },
+            footerNote: 'You received this because a password reset was requested for this address.',
             text: `You requested a password reset. Click the link to reset your password: ${resetLink}`,
-        };
-        
-        await transporter.sendMail(mailOptions);
+        });
 
         logger.info('Password reset email sent to: %s', email);
-        res.status(200).json({ message: 'Password reset email sent.' });
+        res.status(200).json({ message: genericMessage });
     } catch (error) {
         logger.error('Error requesting password reset: %s', error.message);
         res.status(500).json({ error: 'Internal server error.' });
@@ -563,8 +573,24 @@ const requestPasswordReset = async (req, res) => {
 const resetPassword = async (req, res) => {
     const { token, newPassword } = req.body;
 
+    // Same policy as register - otherwise the reset flow would let a weak
+    // password back in through the side door.
+    const passwordError = passwordPolicyError(newPassword);
+    if (passwordError) {
+        return res.status(400).json({ error: passwordError });
+    }
+
+    // A bad or expired token is the user's most likely failure (the link is
+    // only valid for 1 hour) - answer 400 with a actionable message, not 500.
+    let decoded;
     try {
-        const decoded = jwt.verify(token, jwtSecret);
+        decoded = jwt.verify(token, jwtSecret);
+    } catch (error) {
+        logger.warn('Invalid password reset token: %s', error.message);
+        return res.status(400).json({ error: 'This reset link is invalid or has expired - request a new one.' });
+    }
+
+    try {
         const user = await userModel.getUserById(req.pool, decoded.userId);
         if (!user) {
             logger.warn('Password reset attempted for non-existing user: %s', decoded.userId);
@@ -648,41 +674,21 @@ const sendSupportEmail = async (req, res) => {
     }
 
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: process.env.EMAIL_USERNAME,
-          pass: process.env.EMAIL_PASSWORD,
-        },
+      // Internal mail (to the support inbox), but branded like the rest so
+      // the details are easy to scan.
+      await sendEmail({
+        to: process.env.EMAIL_USERNAME,
+        subject: `Support request from ${userEmail}`,
+        heading: 'New support request',
+        paragraphs: [
+          `From: ${userEmail}`,
+          `Issue type: ${issueType}`,
+          issueDescription,
+        ],
+        text: `A user has requested support. Details below:\n\nFrom: ${userEmail}\nIssue Type: ${issueType}\n\nIssue Description:\n${issueDescription}`,
       });
-  
-      const mailOptions = {
-        from: process.env.EMAIL_USERNAME,
-        to: process.env.EMAIL_USERNAME, 
-        subject: `Support Request from ${userEmail}`,
-        text: `
-        A user has requested support. Details below:
-
-        From: ${userEmail}
-        Issue Type: ${issueType}
-
-        Issue Description:
-        ${issueDescription}
-        `,
-      };
-  
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          logger.error('Error sending support email:', error);
-          return res.status(500).json({ error: 'Error sending support email.' });
-        } else {
-          logger.info('Support email sent:', info.response);
-          return res.status(200).json({ message: 'Support request sent successfully.' });
-        }
-      });
+      logger.info('Support email sent for %s', userEmail);
+      return res.status(200).json({ message: 'Support request sent successfully.' });
     } catch (error) {
       logger.error('Error in sendSupportEmail:', error.message);
       return res.status(500).json({ error: 'Internal server error.' });

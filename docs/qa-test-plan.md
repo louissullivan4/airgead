@@ -72,10 +72,10 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 
 | # | Steps | Expected |
 |---|---|---|
-| A1 | Open `/` logged out | Landing renders. Header: "For accountants" → `/signup`, "Pricing" → `/pricing`, "Log in", "Start free". Footer links to pricing/terms/privacy/login |
+| A1 | Open `/` logged out | Landing renders. Header: "For accountants" → `/signup/accountants`, "Pricing" → `/pricing`, "Log in", "Start free". Footer links to pricing/terms/privacy/login |
 | A2 | Open `/login`, `/signup`, `/forgot-password`, `/offline` logged out | All render (public) |
 | A3 | Open `/home` (or any app URL) logged out | Redirect to `/login` |
-| A4 | Open `/pricing`, `/terms`, `/privacy` logged out | **Currently redirects to `/login`** — known issue #5 (§Known issues): legal/pricing pages aren't in the public path list. Log it if not yet fixed; also note the signup consent links open these in a new tab and bounce |
+| A4 | Open `/pricing`, `/terms`, `/privacy` logged out | All render publicly (fixed — was https://github.com/louissullivan4/airgead/issues/8)
 | A5 | Log in, then open `/` or `/login` | Redirect to `/home` |
 | A6 | `/health` on the backend (`curl localhost:8080/health`) | 200, no auth needed |
 
@@ -88,10 +88,10 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 | B1 | `/signup`: fill first/surname/email/password, leave "Set up your organisation" collapsed, tick consent, submit | Lands on `/home`. Personal org auto-named "Fname Sname", nav shows only Home/Transactions/Settings (P1). Currency EUR |
 | B2 | Same but submit **without** ticking consent | Button disabled; if forced, error "Please agree to the Terms of Service and Privacy Policy to continue." |
 | B3 | Expand "Add details": org name "QA Bakery", type Hospitality, country IE, VAT number | Business org created; nav now includes Tax summary + Team (P2). Settings → Organisation shows the entered values |
-| B4 | Expand "Add details", tick **"This is an accountancy practice"**, name the org, submit | New firm: Clients appears in nav; Team page says "Accountants" |
-| B5 | Repeat B4 but leave org name **blank** | **Known issue #3**: practice checkbox silently ignored — user gets a personal org, no Clients nav. Log if unfixed |
+| B4 | Open `/signup/accountants` (linked from the landing "For accountants" and from the main signup), fill practice name, submit | New firm: Clients appears in nav; Team page says "Accountants". The practice checkbox is gone from `/signup` — practices sign up on the dedicated page (fixed — was https://github.com/louissullivan4/airgead/issues/9) |
+| B5 | On `/signup` expand "Add details" and leave org name **blank**; on `/signup/accountants` leave practice name **blank** | Submit blocked with inline "Organisation name is required." / "Practice name is required." — org details are never silently dropped (fixed — was known issue #3, https://github.com/louissullivan4/airgead/issues/10) |
 | B6 | Sign up with an email that already exists | 400 "User with this email already exists." shown inline |
-| B7 | Sign up with a 1-character password | **Currently accepted** (no strength rules — known issue #2). Verify hint text says "At least 8 characters" but nothing enforces it |
+| B7 | Sign up with a weak password | Blocked: live checklist (8+ chars, lower, upper, number, symbol), retype field with mismatch error, reveal toggles on both inputs. The register and reset endpoints enforce the same rules server-side (fixed — was known issue #2, https://github.com/louissullivan4/airgead/issues/11) |
 
 **B8–B11 invite signups** (need SMTP or token from logs; all invite links = `/signup?token=…`, valid 7 days, invitee auto-verified, org section hidden on the signup page):
 
@@ -117,8 +117,8 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 | C9 | Use the resend button / `POST /users/resend-verification` with any email | Always 200 "If that address needs verification, a new link is on its way." (no user enumeration) |
 | C10 | Open an **expired/invalid** verification link | Redirect `/login?verified=expired` → error text prompting a new link |
 | C11 | `/forgot-password` with a seeded email | Success screen "If an account exists for {email}, a reset link is on its way." |
-| C12 | `/forgot-password` with an unknown email | **Known issue #4**: shows "User not found." (enumeration leak). Log if unfixed |
-| C13 | Open the emailed reset link `/reset-password?token=…` | **Known issue #1**: page does not exist → 404. The backend endpoint works but has no UI. Log if unfixed |
+| C12 | `/forgot-password` with an unknown email | Same success screen as C11 — 200 with the generic message, no email sent (fixed — was known issue #4) |
+| C13 | Open the emailed reset link `/reset-password?token=…` | Page renders with the same password-rules UX as signup. Expired/invalid token → 400 "This reset link is invalid or has expired - request a new one." with a link to request a fresh one (fixed — was known issue #1) |
 
 ## Suite D — Core capture & transactions (run as P1; spot-check as P6a which has seed data)
 
@@ -126,7 +126,7 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 |---|---|---|
 | D1 | `/home` on a fresh account | Stat cards all €0.00 / 0; "No expenses recorded for {year} yet."; "No transactions yet" empty state with Add button |
 | D2 | Add → **camera dialog** appears; click "Take a photo" on desktop | File picker opens (mobile: camera). Pick a receipt photo → spinner "Cleaning up receipt…" (dialog can't be closed) → form opens in **Receipt mode** with thumbnail |
-| D3 | Receipt mode: set merchant, add 2 line items (category + amount each), save | Toast "2 items added". Two rows appear sharing one receipt icon. Home Receipts counter: see known issue #7 (captured receipts don't increment it) |
+| D3 | Receipt mode: set merchant, add 2 line items (category + amount each), save | Toast "2 items added". Two rows appear sharing one receipt icon. Home Receipts counter +1 (multi-line captures count once; fixed — was known issue #7) |
 | D4 | Receipt mode: try saving a line without category or with amount 0 | Toast "Each line needs a category and a non-zero amount." |
 | D5 | Add → **Skip photo** | Blank single form. Save an expense (title, category, amount, date) → row appears |
 | D6 | Add an **Income** entry (type toggle) | No category/capital UI; renders green `+` amount; Home Income card updates |
@@ -138,7 +138,7 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 | D12 | Receipt thumbnail click | Full image opens in new tab (signed URL). Re-open after >5 min idle: link in old tab expires (403 from storage), re-rendered thumb re-signs |
 | D13 | **Capital toggle**: add expense with category "Equipment" (or any capital-flagged) | Toggle pre-ticks; Asset type select appears. After save: **Capital chip** on the row; asset on `/reports` register as "From transaction" |
 | D14 | Edit that expense, untick Capital | Chip gone; asset removed from register; transaction remains |
-| D15 | Header **Export** | Downloads `transactions_{year}.zip` (xlsx + images/). On a no-data year: toast shows generic "Not Found" — known issue #6 |
+| D15 | Header **Export** | Downloads `transactions_{year}.zip` (xlsx + images/). On a no-data year: toast shows "No expenses found for the given user and year." (fixed — was known issue #6) |
 | D16 | Categories select in the form | Shows the org's tree (groups + indented children). For P6a expect the equine template |
 
 ## Suite E — Business-owner extras (run as P2 or P6b)
@@ -179,7 +179,7 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 | G4 | Open a client → detail page | "Viewing {name} · read-only" bar; Transactions tab with filter/sort/pagination; no edit/delete controls anywhere |
 | G5 | Client detail → Tax summary tab + year picker | Loads the client's summary; year change refetches |
 | G6 | Export (list row or detail) | Downloads zip: `transactions_{year}.xlsx` (Expenses sheet + Tax summary + Capital allowances + VAT sheets, Capital column, embedded images) + `images/` |
-| G7 | Export a client with no transactions this year | Toast error (404 path) |
+| G7 | Export a client with no transactions this year | Toast "No transactions found for the given client and year." (fixed — was known issue #6) |
 | G8 | Invite client (fresh email) → complete signup | New client org appears in list, owned by P4 (Accountant column) |
 | G9 | **Reassign** (row menu, admin only) → pick the staff accountant | Success toast; Accountant column updates; P5 can now see it |
 | G10 | **Revoke access** on a test client → confirm | Client disappears from list. Their login/data unaffected (verify by logging in as them). Re-invite works afterwards |
@@ -214,8 +214,8 @@ Personas without seed accounts — create during Suite B: **P1 solo trader** (fr
 | J2 | Orgs table | All orgs, member counts, year stats, status. Own org row: only "Open" (no suspend/delete) |
 | J3 | Users table | All users with org, platform pill. Own row: no actions menu |
 | J4 | Grant super admin to a test user → verify → revoke | PATCH works; target sees Admin nav on next login. Attempting on own id → 400 |
-| J5 | **Suspend a user** → they log out & retry login | 403 "This account has been suspended." — **but an existing session keeps working until the 7-day token expires (known behaviour #8)** |
-| J6 | **Suspend an org** → its members' fresh logins | 403 "This organisation has been suspended." Same live-session caveat |
+| J5 | **Suspend a user** → they log out & retry login | 403 "This account has been suspended." Existing sessions are cut off too — their next API call answers 403 (fixed — was known behaviour #8) |
+| J6 | **Suspend an org** → its members' fresh logins | 403 "This organisation has been suspended." Members' live sessions also blocked on their next API call |
 | J7 | GDPR delete: a member user | User + their expenses/receipts gone; org survives; any client links they created lose their owner (firm admin still sees the client) |
 | J8 | GDPR delete: a user who solely owns an org | Cascades the whole org. If the org has other members → 409 "…Delete the organisation or reassign ownership first." |
 | J9 | Delete an org (not your own) | Cascade removes links/users/data. Own org → 400 |
@@ -306,13 +306,15 @@ Restart backend with `BILLING_ENFORCED=true`. Create a fresh solo signup (it get
 
 ## Known issues (log as pre-existing; verify status before filing duplicates)
 
-1. **`/reset-password` page missing** — the emailed reset link 404s; backend endpoint exists but has no UI (C13).
-2. **No password rules enforced** — 1-char passwords accepted at signup and reset (B7).
-3. **Practice checkbox ignored when org name blank** at signup — user silently gets a personal org (B5).
-4. **Forgot-password reveals account existence** — "User not found." for unknown emails; resend-verification is enumeration-safe by contrast (C12).
-5. **`/pricing`, `/terms`, `/privacy` blocked for logged-out visitors** — middleware only allows `/`, auth paths, `/offline` (A4).
-6. **Export "no data" toast shows generic "Not Found"** — backend sends `{message}` but the client only reads `{error}` (D15, G7).
-7. **Home "Receipts" stat undercounts** — camera-captured receipts (receipt_id on the expense, `receipt_image_url` null) don't increment it; only legacy uploads do (D3).
-8. **Suspension doesn't kill live sessions** — enforced at login only; a suspended user's existing 7-day token keeps working (J5/J6).
-9. **"For accountants" landing link** goes to plain `/signup`, not a dedicated page (A1) — confirm this is intended.
-10. **Winston boot warnings print `%s` un-interpolated** in `Env check:` lines — cosmetic, but hides which env var the warning is about (L4).
+All ten issues from the previous pass are **fixed** (2026-07-04). Original entries kept for reference — re-verify via the cases in brackets:
+
+1. ~~**`/reset-password` page missing**~~ — Fixed: page exists with the shared password-rules UX; bad/expired tokens get an actionable 400 (C13).
+2. ~~**No password rules enforced**~~ — Fixed: signup/reset enforce 8+ chars, lower, upper, number, symbol client- AND server-side, with confirm field + reveal toggles (B7).
+3. ~~**Practice checkbox ignored when org name blank**~~ — Fixed: org/practice name is required whenever the section is open; the checkbox itself is gone (see 9) (B5).
+4. ~~**Forgot-password reveals account existence**~~ — Fixed: always 200 with the generic message, matching resend-verification (C12).
+5. ~~**`/pricing`, `/terms`, `/privacy` blocked for logged-out visitors**~~ — Fixed: `PUBLIC_PATHS` allow-list in the middleware (A4).
+6. ~~**Export "no data" toast shows generic "Not Found"**~~ — Fixed: backend answers `{error}` and the client also falls back to `{message}` (D15, G7).
+7. ~~**Home "Receipts" stat undercounts**~~ — Fixed: counts distinct captured receipts (`receipt_id`) plus legacy uploads (D3).
+8. ~~**Suspension doesn't kill live sessions**~~ — Fixed: auth middleware checks user/org status per request; deleted accounts also 401 immediately (J5/J6).
+9. ~~**"For accountants" landing link goes to plain `/signup`**~~ — Fixed: dedicated `/signup/accountants` page (practice name required, no business type); the practice checkbox was removed from `/signup`, which now cross-links to it (A1, B4).
+10. ~~**Winston boot warnings print `%s` un-interpolated**~~ — Fixed: `format.splat()` added to the logger, so all `%s`/`%o` placeholders interpolate (L4).

@@ -99,11 +99,14 @@ describe('User Controller Functions', () => {
 
   // ---- requestPasswordReset ----------------------------------------------
   describe('requestPasswordReset', () => {
-    it('should return 404 if user not found', async () => {
+    it('should return 200 without sending when the user is unknown (no enumeration)', async () => {
       req.body = { email: 'nope@example.com' };
       sinon.stub(userModel, 'getUserByEmail').resolves(null);
+      const sendMail = sinon.stub().resolves(true);
+      sinon.stub(nodemailer, 'createTransport').returns({ sendMail });
       await userController.requestPasswordReset(req, res);
-      expect(res.status.calledWith(404)).toBe(true);
+      expect(res.status.calledWith(200)).toBe(true);
+      expect(sendMail.notCalled).toBe(true);
     });
 
     it('should send a reset email and return 200', async () => {

@@ -6,6 +6,11 @@ export const TOKEN_COOKIE = "airgead_token";
 // Pages reachable without a session. Everything else requires the auth cookie.
 export const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-password"];
 
+// Public marketing/legal pages, reachable in any auth state. Linked from the
+// landing header/footer and the signup consent text, so logged-out visitors
+// must be able to read them.
+export const PUBLIC_PATHS = ["/pricing", "/terms", "/privacy"];
+
 // Phase 2 OCR auto-fill feature flag. DORMANT by default: when false, the camera
 // capture flow goes straight to the manual form - no OCR auto-fill UI renders and
 // no parsed data is used. Mirror of the backend OCR_PROVIDER/OCR_AUTOFILL_ENABLED

@@ -22,8 +22,16 @@ export class ApiError extends Error {
 }
 
 async function parseError(res: Response): Promise<{ message: string; code?: string }> {
-  const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
-  return { message: body?.error ?? res.statusText ?? "Request failed", code: body?.code };
+  const body = (await res.json().catch(() => null)) as {
+    error?: string;
+    // A few legacy endpoints answer { message } instead of { error }.
+    message?: string;
+    code?: string;
+  } | null;
+  return {
+    message: body?.error ?? body?.message ?? res.statusText ?? "Request failed",
+    code: body?.code,
+  };
 }
 
 // A 401 from the proxy means the session is gone (logged out, expired, or the
@@ -98,6 +106,12 @@ export const api = {
       request<void>("/users/request-password-reset", {
         method: "POST",
         body: JSON.stringify({ email }),
+      }),
+    /** Complete a password reset with the token from the emailed link. */
+    resetPassword: (token: string, newPassword: string) =>
+      request<void>("/users/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, newPassword }),
       }),
     /** Re-send the email-verification link (rate-limited; never confirms account existence). */
     resendVerification: (email: string) =>
@@ -678,6 +692,8 @@ export interface OrganisationInput {
   type?: "personal" | "business";
   org_category?: string;
   vat_status?: VatStatus;
+  /** Marks the org as an accountancy practice (set by /signup/accountants). */
+  is_accountant_practice?: boolean;
 }
 
 /** Organisation row returned by the backend. */
