@@ -378,6 +378,25 @@ const getUsersByOrgId = async (pool, orgId) => {
     }
 };
 
+// User + owning-org status in one round trip. Used by the auth middleware's
+// per-request suspension check, so a suspended account/org is cut off
+// immediately instead of riding out its 7-day token.
+const getAccountStatuses = async (pool, userId) => {
+    try {
+        const result = await pool.query(
+            `SELECT u.account_status, o.status AS org_status
+             FROM users u
+             LEFT JOIN organisations o ON o.id = u.org_id
+             WHERE u.id = $1`,
+            [userId]
+        );
+        return result.rows[0] || null;
+    } catch (error) {
+        logger.error('Error fetching account statuses', { userId, error: error.message });
+        throw error;
+    }
+};
+
 // Phase 0 tenant scoping helper: does the given user belong to the given org?
 // Used by controllers to reject cross-org access (403) on by-id endpoints.
 const isUserInOrg = async (pool, userId, orgId) => {
@@ -471,5 +490,6 @@ module.exports = {
     getUsersByOrgId,
     getUserPasswordByEmail,
     updateUserById,
-    isUserInOrg
+    isUserInOrg,
+    getAccountStatuses
 };

@@ -20,6 +20,9 @@ const logger = createLogger({
     silent: process.env.NODE_ENV === 'test',
     format: format.combine(
         withRequestId(),
+        // util.format-style interpolation: without this, every '%s'/'%o'
+        // placeholder prints literally instead of the value passed for it.
+        format.splat(),
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         format.printf(({ timestamp, level, message, ...meta }) => {
             let log = `[${timestamp}] [${level}]: ${message}`;

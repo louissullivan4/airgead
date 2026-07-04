@@ -139,7 +139,7 @@ const exportClient = async (req, res) => {
 
         const expenses = await expenseModel.getExpensesByOrgIdAndYear(req.pool, clientOrgId, year);
         if (expenses.length === 0) {
-            return res.status(404).json({ message: 'No transactions found for the given client and year.' });
+            return res.status(404).json({ error: 'No transactions found for the given client and year.' });
         }
 
         // The tax-season pack: Form 11 buckets, capital-allowances schedule and

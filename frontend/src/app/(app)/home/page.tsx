@@ -62,7 +62,11 @@ export default function HomePage() {
   const { income, expensesTotal, net, receiptCount, byCategory, recent } = useMemo(() => {
     let income = 0;
     let expensesTotal = 0;
-    let receiptCount = 0;
+    // Camera captures store the image on a shared receipts row (receipt_id,
+    // possibly across several line items), legacy uploads on the expense
+    // itself (receipt_image_url) - count distinct receipts across both.
+    let legacyReceiptCount = 0;
+    const receiptIds = new Set<string>();
     const categoryMap = new Map<string, number>();
 
     for (const e of expenses) {
@@ -73,8 +77,13 @@ export default function HomePage() {
         expensesTotal += amount;
         categoryMap.set(e.category, (categoryMap.get(e.category) ?? 0) + amount);
       }
-      if (e.receipt_image_url) receiptCount += 1;
+      if (e.receipt_id) {
+        receiptIds.add(e.receipt_id);
+      } else if (e.receipt_image_url) {
+        legacyReceiptCount += 1;
+      }
     }
+    const receiptCount = receiptIds.size + legacyReceiptCount;
 
     const byCategory = Array.from(categoryMap, ([category, value]) => ({ category, value }));
     const recent = [...expenses]

@@ -9,6 +9,7 @@ import { COUNTRIES, DEFAULT_COUNTRY, ORG_CATEGORIES } from "@/lib/org";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordFields, passwordMeetsRules } from "@/components/password-fields";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ function SignupForm() {
   const [sname, setSname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Consent is required; the timestamp of acceptance IS the account-creation
@@ -35,28 +37,45 @@ function SignupForm() {
   const [consent, setConsent] = useState(false);
 
   // Optional org-creation step (self-serve only). Invitees join the inviter's
-  // org, so the section is hidden for them.
+  // org, so the section is hidden for them. Accountancy practices sign up on
+  // /signup/accountants instead - this form only creates normal orgs.
   const [showOrg, setShowOrg] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [orgCountry, setOrgCountry] = useState(DEFAULT_COUNTRY);
   const [orgVat, setOrgVat] = useState("");
   const [orgCategory, setOrgCategory] = useState("");
-  const [isPractice, setIsPractice] = useState(false);
+  const [orgNameError, setOrgNameError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setOrgNameError(null);
     if (!consent) {
       setError("Please agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
+    if (!passwordMeetsRules(password)) {
+      setError("Your password does not meet all the requirements listed below it.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    // The org section silently produced no payload on a blank name (the
+    // backend then auto-creates a personal org, discarding the details) - so
+    // a name is required whenever the section is open.
+    if (!inviteToken && showOrg && !orgName.trim()) {
+      setOrgNameError("Organisation name is required.");
       return;
     }
     setLoading(true);
     try {
       // Currency defaults to EUR; address/occupation/tax details are collected
       // later in Settings to keep signup short. The organisation is sent only
-      // when the user opened the section and named it - otherwise the backend
-      // auto-creates a personal org.
+      // when the user opened the section (the validation above guarantees it
+      // is named) - otherwise the backend auto-creates a personal org.
       const organisation =
         !inviteToken && showOrg && orgName.trim()
           ? {
@@ -66,7 +85,6 @@ function SignupForm() {
               vat_number:
                 orgCountry === "IE" && orgVat.trim() ? orgVat.trim() : undefined,
               org_category: orgCategory || undefined,
-              is_accountant_practice: isPractice || undefined,
             }
           : undefined;
       await api.auth.register({
@@ -131,16 +149,12 @@ function SignupForm() {
             required
           />
         </Field>
-        <Field label="Password" htmlFor="password" hint="At least 8 characters.">
-          <Input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </Field>
+        <PasswordFields
+          password={password}
+          confirmPassword={confirmPassword}
+          onPasswordChange={setPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+        />
 
         {!inviteToken && (
           <div className="rounded-lg border border-border p-4">
@@ -163,31 +177,22 @@ function SignupForm() {
 
             {showOrg && (
               <div className="mt-4 space-y-4">
-                <label
-                  htmlFor="org-practice"
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 p-3"
+                <Field
+                  label="Organisation name"
+                  htmlFor="org-name"
+                  required
+                  error={orgNameError ?? undefined}
                 >
-                  <input
-                    id="org-practice"
-                    type="checkbox"
-                    checked={isPractice}
-                    onChange={(e) => setIsPractice(e.target.checked)}
-                    className="mt-0.5 size-4 accent-primary"
-                  />
-                  <span className="text-sm">
-                    <span className="font-medium">This is an accountancy practice</span>
-                    <span className="block text-xs text-muted-foreground">
-                      I manage other people&apos;s books. Unlocks the Clients workspace to invite and
-                      oversee client organisations.
-                    </span>
-                  </span>
-                </label>
-                <Field label="Organisation name" htmlFor="org-name">
                   <Input
                     id="org-name"
                     value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
+                    onChange={(e) => {
+                      setOrgName(e.target.value);
+                      setOrgNameError(null);
+                    }}
                     placeholder="e.g. Galway Equine"
+                    aria-invalid={orgNameError ? true : undefined}
+                    required
                   />
                 </Field>
                 <Field label="Description" htmlFor="org-description" hint="Optional">
@@ -241,6 +246,17 @@ function SignupForm() {
                 </div>
               </div>
             )}
+
+            <p className="mt-3 text-xs text-muted-foreground">
+              Running an accountancy practice?{" "}
+              <Link
+                href="/signup/accountants"
+                className="font-medium text-primary hover:underline"
+              >
+                Use the accountant signup
+              </Link>{" "}
+              to manage your clients&apos; books.
+            </p>
           </div>
         )}
 

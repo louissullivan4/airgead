@@ -110,4 +110,79 @@ describe('Tenant isolation', () => {
       expect(req.user.orgId).toBe('org-A');
     });
   });
+
+  // (c) suspension is enforced per request (not just at login), so a
+  // suspended account/org can't ride out its existing 7-day token
+  describe('authenticateToken suspension check', () => {
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    const makeReq = () => ({
+      pool: {},
+      headers: {
+        authorization: `Bearer ${jwt.sign({ userId: 'u1', role: 'user', orgId: 'org-A' }, process.env.JWT_SECRET)}`,
+      },
+    });
+
+    it('403s a suspended user mid-session', async () => {
+      sinon.stub(userModel, 'getAccountStatuses').resolves({ account_status: 'suspended', org_status: 'active' });
+      const req = makeReq();
+      const res = makeRes();
+      const next = sinon.stub();
+
+      authenticateToken(req, res, next);
+      await flush();
+
+      expect(res.status.calledWith(403)).toBe(true);
+      expect(next.notCalled).toBe(true);
+    });
+
+    it('403s a member of a suspended org mid-session', async () => {
+      sinon.stub(userModel, 'getAccountStatuses').resolves({ account_status: 'active', org_status: 'suspended' });
+      const req = makeReq();
+      const res = makeRes();
+      const next = sinon.stub();
+
+      authenticateToken(req, res, next);
+      await flush();
+
+      expect(res.status.calledWith(403)).toBe(true);
+      expect(next.notCalled).toBe(true);
+    });
+
+    it('401s when the account no longer exists (deleted mid-session)', async () => {
+      sinon.stub(userModel, 'getAccountStatuses').resolves(null);
+      const req = makeReq();
+      const res = makeRes();
+      const next = sinon.stub();
+
+      authenticateToken(req, res, next);
+      await flush();
+
+      expect(res.status.calledWith(401)).toBe(true);
+      expect(next.notCalled).toBe(true);
+    });
+
+    it('passes an active user through', async () => {
+      sinon.stub(userModel, 'getAccountStatuses').resolves({ account_status: 'active', org_status: 'active' });
+      const req = makeReq();
+      const res = makeRes();
+      const next = sinon.stub();
+
+      authenticateToken(req, res, next);
+      await flush();
+
+      expect(next.calledOnce).toBe(true);
+    });
+
+    it('fails open when the status query errors', async () => {
+      sinon.stub(userModel, 'getAccountStatuses').rejects(new Error('db down'));
+      const req = makeReq();
+      const res = makeRes();
+      const next = sinon.stub();
+
+      authenticateToken(req, res, next);
+      await flush();
+
+      expect(next.calledOnce).toBe(true);
+    });
+  });
 });
