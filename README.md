@@ -19,16 +19,16 @@ sole traders, and the accountants who serve them.
 
 ## Features
 
-- 📸 **Receipt capture** — snap a photo; it's stored and attached to the expense.
-- 🗂️ **Auto-categorization** — every expense lands in the right category.
-- 🇮🇪 **Irish tax engine** — capital allowances (wear & tear), VAT, and a Form 11 pre-sort.
-- 📊 **Tax summary & reports** — the full year's picture per business, in one view.
-- 📦 **Tax-year exports** — Excel, CSV, and a receipt-archive ZIP in a click.
-- 👥 **Accountant workspace** — practices manage every client's books; invited clients are free.
-- 💳 **Billing** — 14-day free trial, then Stripe subscriptions (solo or per client seat).
-- 🔗 **Sage export** — push client transactions to Sage Business Cloud (optional).
-- 🔒 **Multi-tenant** — per-organisation isolation, owner/member roles, and a super-admin surface.
-- 📱 **Installable PWA** — works offline-aware on mobile.
+- **Receipt capture** — snap a photo; it's stored and attached to the expense.
+- **Auto-categorization** — every expense lands in the right category.
+- **Irish tax engine** — capital allowances (wear & tear), VAT, and a Form 11 pre-sort.
+- **Tax summary & reports** — the full year's picture per business, in one view.
+- **Tax-year exports** — Excel, CSV, and a receipt-archive ZIP in a click.
+- **Accountant workspace** — practices manage every client's books; invited clients are free.
+- **Billing** — 14-day free trial, then Stripe subscriptions (solo or per client seat).
+- **Sage export** — push client transactions to Sage Business Cloud (optional).
+- **Multi-tenant** — per-organisation isolation, owner/member roles, and a super-admin surface.
+- **Installable PWA** — works offline-aware on mobile.
 
 ## Tech stack
 
