@@ -1,0 +1,44 @@
+name: Railway Redeploy
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Display label for this stage (test / production)'
+        required: true
+        type: string
+      secret-prefix:
+        description: 'Prefix of the secrets holding the ids: RAILWAY or RAILWAY_TEST'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  redeploy:
+    name: Redeploy ${{ inputs.stage }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      STAGE: ${{ inputs.stage }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      ENVIRONMENT_ID: ${{ secrets[format('{0}_ENVIRONMENT_ID', inputs.secret-prefix)] }}
+      BACKEND_SERVICE_ID: ${{ secrets[format('{0}_BACKEND_SERVICE_ID', inputs.secret-prefix)] }}
+      FRONTEND_SERVICE_ID: ${{ secrets[format('{0}_FRONTEND_SERVICE_ID', inputs.secret-prefix)] }}
+    steps:
+      - name: Redeploy backend + frontend (re-pull :latest)
+        run: |
+          redeploy() {
+            local label="$1" service_id="$2" resp
+            resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -nc --arg e "$ENVIRONMENT_ID" --arg s "$service_id" \
+                '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
+            echo "$resp"
+            echo "$resp" | jq -e '.errors == null' >/dev/null \
+              || { echo "Railway $STAGE $label redeploy failed"; return 1; }
+          }
+          redeploy backend "$BACKEND_SERVICE_ID"
+          redeploy frontend "$FRONTEND_SERVICE_ID"

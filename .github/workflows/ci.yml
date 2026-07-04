@@ -16,12 +16,9 @@ on:
       - '.gitignore'
       - 'LICENSE'
 
-# Default GITHUB_TOKEN scope for every job: read-only. Jobs that push images
-# grant themselves packages:write explicitly.
 permissions:
   contents: read
 
-# Cancel in-progress runs for PRs (new push supersedes); never cancel a main deploy mid-flight.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -32,8 +29,6 @@ env:
   FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
 
 jobs:
-  # ── CI checks run in parallel ─────────────────────────────────────────────
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -50,7 +45,6 @@ jobs:
           key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - if: steps.root-cache.outputs.cache-hit != 'true'
         run: npm ci
-      # Runs eslint (backend) + next lint (frontend) across both workspaces.
       - run: npm run lint
 
   test:
@@ -99,8 +93,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '20'
-      # Legacy-name check + rename-corruption guard (glued "airgead"). Pure
-      # node + git grep, so no install step is needed.
       - run: npm run check:brand --workspace=backend
 
   # ── Build & push images (main only) ───────────────────────────────────────
@@ -182,35 +174,22 @@ jobs:
         env:
           DB_URL: ${{ secrets.DB_URL }}
 
-  deploy:
-    name: Deploy to Railway
+  deploy-test:
+    name: Deploy to Railway (test)
     if: github.event_name == 'push'
     needs: [docker-backend, docker-frontend, migrate]
-    runs-on: ubuntu-latest
-    environment: production
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
-    steps:
-      - name: Redeploy backend (re-pull :latest)
-        env:
-          SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE_ID }}
-        run: |
-          resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "$(jq -nc --arg e "$RAILWAY_ENVIRONMENT_ID" --arg s "$SERVICE_ID" \
-              '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
-          echo "$resp"
-          echo "$resp" | jq -e '.errors == null' >/dev/null || { echo "Railway backend redeploy failed"; exit 1; }
-      - name: Redeploy frontend (re-pull :latest)
-        env:
-          SERVICE_ID: ${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }}
-        run: |
-          resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "$(jq -nc --arg e "$RAILWAY_ENVIRONMENT_ID" --arg s "$SERVICE_ID" \
-              '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
-          echo "$resp"
-          echo "$resp" | jq -e '.errors == null' >/dev/null || { echo "Railway frontend redeploy failed"; exit 1; }
+    uses: ./.github/workflows/railway-redeploy.yml
+    with:
+      stage: test
+      secret-prefix: RAILWAY_TEST
+    secrets: inherit
+
+  deploy-prod:
+    name: Deploy to Railway (production)
+    if: github.event_name == 'push'
+    needs: [deploy-test]
+    uses: ./.github/workflows/railway-redeploy.yml
+    with:
+      stage: production
+      secret-prefix: RAILWAY
+    secrets: inherit
