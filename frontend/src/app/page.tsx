@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Camera, Check, FileDown, Sparkles } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { PRICING } from "@/lib/pricing";
+import { getPublicPlans, formatPrice } from "@/lib/plans";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
@@ -9,6 +11,10 @@ import { DashboardPreview } from "@/components/landing/dashboard-preview";
 export const metadata: Metadata = {
   title: { absolute: `${BRAND} - expense & receipt tracking for freelancers` },
 };
+
+// The pricing section reflects live enforcement + Stripe price, so render per
+// request rather than baking it at build time.
+export const dynamic = "force-dynamic";
 
 const FEATURES = [
   {
@@ -42,7 +48,9 @@ const PLAN_FEATURES = [
   "Multi-currency (EUR, GBP, USD)",
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const plans = await getPublicPlans();
+  const premiumPrice = formatPrice(plans.premium, PRICING.premium.fallbackPrice);
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
@@ -158,36 +166,94 @@ export default function LandingPage() {
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-semibold tracking-tight">Simple pricing</h2>
               <p className="mt-3 text-muted-foreground">
-                {BRAND} is free while we&apos;re getting started - no card, no catch.
+                {plans.enforced
+                  ? `Start free for ${plans.trialDays} days, then Premium at ${premiumPrice}/month. Cancel anytime.`
+                  : `${BRAND} is free while we're getting started - no card, no catch.`}
               </p>
             </div>
-            <div className="mx-auto mt-12 max-w-md">
-              <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
-                <div className="flex items-baseline justify-between">
-                  <h3 className="text-lg font-semibold">Free</h3>
-                  <span className="text-3xl font-semibold tracking-tight">€0</span>
+
+            {plans.enforced ? (
+              <div className="mx-auto mt-12 grid max-w-3xl gap-6 sm:grid-cols-2">
+                {/* Free trial */}
+                <div className="flex flex-col rounded-2xl border border-border bg-card p-8 shadow-sm">
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="text-lg font-semibold">Free trial</h3>
+                    <div className="text-right">
+                      <span className="text-3xl font-semibold tracking-tight">€0</span>
+                      <span className="block text-xs text-muted-foreground">
+                        free for {plans.trialDays} days
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    The full product, no card required.
+                  </p>
+                  <ul className="mt-6 flex-1 space-y-3">
+                    {PLAN_FEATURES.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5 text-sm">
+                        <Check className="size-4 shrink-0 text-success" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="lg" variant="outline" className="mt-8 w-full">
+                    <Link href="/signup">Start free</Link>
+                  </Button>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Everything you need to track expenses and stay tax-ready.
-                </p>
-                <ul className="mt-6 space-y-3">
-                  {PLAN_FEATURES.map((f) => (
-                    <li key={f} className="flex items-center gap-2.5 text-sm">
-                      <Check className="size-4 shrink-0 text-success" /> {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button asChild size="lg" className="mt-8 w-full">
-                  <Link href="/signup">Get started</Link>
-                </Button>
+                {/* Premium */}
+                <div className="flex flex-col rounded-2xl border border-primary bg-card p-8 shadow-sm ring-1 ring-primary">
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="text-lg font-semibold">Premium</h3>
+                    <div className="text-right">
+                      <span className="text-3xl font-semibold tracking-tight">{premiumPrice}</span>
+                      <span className="block text-xs text-muted-foreground">per month</span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Everything, kept on after your trial.
+                  </p>
+                  <ul className="mt-6 flex-1 space-y-3">
+                    {PLAN_FEATURES.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5 text-sm">
+                        <Check className="size-4 shrink-0 text-success" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="lg" className="mt-8 w-full">
+                    <Link href="/signup">Start free</Link>
+                  </Button>
+                </div>
               </div>
-              <p className="mt-4 text-center text-sm text-muted-foreground">
-                Wondering what it will cost later?{" "}
-                <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2 hover:no-underline">
-                  See pricing
-                </Link>
-              </p>
-            </div>
+            ) : (
+              <div className="mx-auto mt-12 max-w-md">
+                <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="text-lg font-semibold">Free</h3>
+                    <span className="text-3xl font-semibold tracking-tight">€0</span>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Everything you need to track expenses and stay tax-ready.
+                  </p>
+                  <ul className="mt-6 space-y-3">
+                    {PLAN_FEATURES.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5 text-sm">
+                        <Check className="size-4 shrink-0 text-success" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button asChild size="lg" className="mt-8 w-full">
+                    <Link href="/signup">Get started</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              See full details on the{" "}
+              <Link href="/pricing" className="font-medium text-foreground underline underline-offset-2 hover:no-underline">
+                pricing page
+              </Link>
+              .
+            </p>
           </div>
         </section>
 

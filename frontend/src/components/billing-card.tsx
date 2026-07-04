@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CreditCard, ExternalLink } from "lucide-react";
-import { api, type BillingStatus } from "@/lib/api";
-import { PRICING } from "@/lib/pricing";
+import { api, type BillingStatus, type PriceInfo } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +17,25 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 
+/**
+ * Format a live Stripe price (minor units) as whole-currency, falling back to a
+ * plain amount when the price isn't available. Mirrors lib/plans.ts formatPrice,
+ * duplicated here because that module is server-only and this is a client card.
+ */
+function fmtPrice(price: PriceInfo | null | undefined, fallbackMajor: number): string {
+  const currency = (price?.currency ?? "EUR").toUpperCase();
+  const major = price ? price.amount / 100 : fallbackMajor;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: Number.isInteger(major) ? 0 : 2,
+    }).format(major);
+  } catch {
+    return `€${major}`;
+  }
+}
+
 /** Human copy for the entitlement states the card can be in. */
 function describe(status: BillingStatus): { badge: string; tone: "default" | "destructive"; line: string } {
   const daysLeft = status.trialEndsAt
@@ -28,7 +46,7 @@ function describe(status: BillingStatus): { badge: string; tone: "default" | "de
       return {
         badge: "Practice",
         tone: "default",
-        line: `Your practice account is free - you pay ${PRICING.currency}${PRICING.practice.price}/month per active client seat.`,
+        line: `Your practice account is free - you pay ${fmtPrice(status.seat, 15)}/month per active client seat.`,
       };
     case "covered_seat":
       return {
@@ -173,7 +191,7 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
                 {redirecting ? <Spinner /> : <CreditCard />}
                 {status.isPractice
                   ? "Set up practice billing"
-                  : `Subscribe - ${PRICING.currency}${PRICING.solo.price}/month`}
+                  : `Subscribe - ${fmtPrice(status.premium, 15)}/month`}
               </Button>
             )}
             {showManage && (

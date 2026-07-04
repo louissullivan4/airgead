@@ -368,6 +368,20 @@ export interface BillingStatus {
   tierInfo: { key: string; label: string; blurb: string };
   /** Practices only: active client seats being paid for. */
   seatCount?: number;
+  /** Live Stripe price for the self-serve plan (minor units); null if unconfigured. */
+  premium?: PriceInfo | null;
+  /** Live Stripe per-client-seat price a practice pays; null if unconfigured. */
+  seat?: PriceInfo | null;
+}
+
+/** A live Stripe price, surfaced for display (never used to charge). */
+export interface PriceInfo {
+  /** Minor units, e.g. 1500 = €15.00. */
+  amount: number;
+  /** ISO currency code, lowercase (Stripe convention). */
+  currency: string;
+  /** Recurring interval, e.g. 'month' | 'year', or null for one-off. */
+  interval: string | null;
 }
 
 // --- Sage export ------------------------------------------------------------

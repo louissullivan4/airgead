@@ -11,6 +11,12 @@ const router = express.Router();
 // needs the raw body) and carries no auth (the signature is the auth).
 
 router.use(injectPool);
+
+// PUBLIC: the marketing pricing + landing pages render from this (enforcement
+// flag, trial length, live Stripe prices). No auth - it exposes nothing org-
+// specific. Must sit ABOVE the auth middleware below.
+router.get('/plans', billingController.getPlans);
+
 // Billing routes are authenticated and scoped - and deliberately NEVER behind
 // the subscription gate: an expired org must always be able to see its status
 // and pay.

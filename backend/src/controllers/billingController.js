@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const { isBillingEnforced, TIERS, TRIAL_DAYS } = require('../config/tiers');
 const entitlements = require('../services/billing/entitlements');
 const stripeClient = require('../services/billing/stripeClient');
+const priceService = require('../services/billing/prices');
 const billingModel = require('../models/billingModel');
 const organisationModel = require('../models/organisationModel');
 const userModel = require('../models/userModel');
@@ -38,11 +39,16 @@ const getStatus = async (req, res) => {
         if (entitlement.isPractice) {
             seatCount = await billingModel.countActiveSeats(req.pool, req.user.orgId);
         }
+        // Live Stripe prices so the Settings card shows the real figure, never a
+        // drifting hardcoded one. Cached; null when Stripe is unconfigured.
+        const prices = await priceService.getLivePrices();
         return res.status(200).json({
             enforced: isBillingEnforced(),
             configured: Boolean(stripeClient.getStripeClient()),
             trialDays: TRIAL_DAYS,
             tierInfo: TIERS[entitlement.tier] || TIERS.trial,
+            premium: prices.premium,
+            seat: prices.seat,
             ...(seatCount === undefined ? {} : { seatCount }),
             ...entitlement,
         });
@@ -207,4 +213,30 @@ const handleWebhook = async (req, res) => {
     return res.status(200).json({ received: true });
 };
 
-module.exports = { getStatus, createCheckoutSession, createPortalSession, handleWebhook, mapStripeStatus };
+// GET /billing/plans - PUBLIC (no auth): the marketing pricing + landing pages
+// render entirely from this. Returns whether billing is enforced, the trial
+// length, and the live Stripe prices (premium = self-serve, seat = per client
+// seat). With enforcement off ("complete demo mode") the pages show the free
+// story; the prices are still returned so the paid copy is ready to render the
+// moment the flag flips. Never throws to the client - degrades to null prices.
+const getPlans = async (req, res) => {
+    try {
+        const prices = await priceService.getLivePrices();
+        return res.status(200).json({
+            enforced: isBillingEnforced(),
+            trialDays: TRIAL_DAYS,
+            premium: prices.premium,
+            seat: prices.seat,
+        });
+    } catch (error) {
+        logger.error('Error building plans response', { error: error.message });
+        return res.status(200).json({
+            enforced: isBillingEnforced(),
+            trialDays: TRIAL_DAYS,
+            premium: null,
+            seat: null,
+        });
+    }
+};
+
+module.exports = { getStatus, getPlans, createCheckoutSession, createPortalSession, handleWebhook, mapStripeStatus };

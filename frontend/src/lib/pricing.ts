@@ -1,16 +1,17 @@
-// Display-only pricing constants. What Stripe ACTUALLY charges comes from the
-// STRIPE_PRICE_SOLO / STRIPE_PRICE_SEAT price ids configured on the backend -
-// whoever edits prices in the Stripe dashboard must keep these in sync.
+// Display COPY for the marketing pricing pages and the Settings billing card.
+// The price NUMBER is not authoritative here - it comes live from Stripe via
+// GET /billing/plans (see lib/plans.ts), so editing the price in the Stripe
+// dashboard updates the site. These constants are the tier names, taglines and
+// feature lists, plus a fallback amount used only when the live price can't be
+// fetched. Keep TRIAL_DAYS in sync with the backend (config/tiers.js).
 
-export const TRIAL_DAYS = 30;
+export const TRIAL_DAYS = 14;
 
 export const PRICING = {
   currency: "€",
-  solo: {
-    name: "Solo",
-    price: 9,
-    unit: "per business / month",
-    tagline: "For sole traders and freelancers running their own books.",
+  free: {
+    name: "Free trial",
+    tagline: "The full product, free while you try it. No card required.",
     features: [
       "Unlimited expenses, income & receipt capture",
       "Irish tax engine: capital allowances, VAT, Form 11 pre-sort",
@@ -18,16 +19,17 @@ export const PRICING = {
       "Invite your accountant for free read access",
     ],
   },
-  practice: {
-    name: "Practice",
-    price: 7,
-    unit: "per client seat / month",
-    tagline: "For accountancy practices. Your own account is free - pay only for active client seats.",
+  premium: {
+    name: "Premium",
+    // Display-only fallback, shown only if the live Stripe price is unavailable.
+    fallbackPrice: 15,
+    unit: "per month",
+    tagline: "Everything in the trial, kept on - one simple monthly price.",
     features: [
-      "Free practice workspace for your whole team",
-      "Every client's records, tax summary & readiness at a glance",
-      "One-click year-end export packs per client",
-      "Seats added and removed as you invite or revoke clients",
+      "Everything in the free trial, uninterrupted",
+      "Unlimited history and tax-year exports",
+      "Invite your accountant for free read access",
+      "Cancel anytime - your records always stay viewable",
     ],
   },
 } as const;
