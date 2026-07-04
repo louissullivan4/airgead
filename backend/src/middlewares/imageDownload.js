@@ -39,8 +39,12 @@ const downloadImages = async (expenses, imagesDir) => {
 
             if (!downloadedByObjectPath.has(objectPath)) {
                 downloadedByObjectPath.set(objectPath, (async () => {
-                    const imageExtension = path.extname(objectPath) || '.jpg';
-                    const imageName = `expense_${expense.id}${imageExtension}`;
+                    // The object key is user-influenced data: only accept a plain
+                    // alphanumeric extension, and build the local name from the
+                    // numeric expense id so nothing user-controlled reaches the path.
+                    const rawExtension = path.extname(objectPath);
+                    const imageExtension = /^\.[a-zA-Z0-9]{1,10}$/.test(rawExtension) ? rawExtension : '.jpg';
+                    const imageName = `expense_${Number(expense.id)}${imageExtension}`;
                     const imagePath = path.join(imagesDir, imageName);
 
                     const exists = await storage.exists(objectPath);

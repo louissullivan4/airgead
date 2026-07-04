@@ -13,7 +13,7 @@ const sageRoutes = require('./routes/sageRoutes');
 const billingController = require('./controllers/billingController');
 const healthController = require('./controllers/healthController');
 const injectPool = require('./middlewares/poolMiddleware');
-const { buildGlobalLimiter, buildStrictLimiter } = require('./config/rateLimits');
+const { buildGlobalLimiter, buildStrictLimiter, buildHealthLimiter } = require('./config/rateLimits');
 const path = require('path');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
@@ -57,9 +57,10 @@ app.post(
     billingController.handleWebhook
 );
 
-// Health probe: unauthenticated and ABOVE the rate limiters - probes fire
-// constantly and must never be throttled away.
-app.get('/health', injectPool, healthController.health);
+// Health probe: unauthenticated and ABOVE the global limiter - probes fire
+// constantly and must never compete with API traffic for rate-limit budget.
+// It still hits the DB, so it carries its own (very generous) limiter.
+app.get('/health', buildHealthLimiter(), injectPool, healthController.health);
 
 // Rate limits (skipped under test so the mocked suites stay deterministic):
 // a generous global ceiling, plus a strict budget on credential endpoints.

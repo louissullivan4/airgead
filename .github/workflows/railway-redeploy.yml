@@ -1,0 +1,64 @@
+name: Railway Redeploy
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Deployment stage: test or production'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  redeploy:
+    name: Redeploy ${{ inputs.stage }}
+    runs-on: ubuntu-latest
+    environment: production
+    # Secrets are referenced literally (never via a computed key) so the job
+    # receives only these values, not the whole secrets context. The stage
+    # picks between them in shell below.
+    env:
+      STAGE: ${{ inputs.stage }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      TEST_ENVIRONMENT_ID: ${{ secrets.RAILWAY_TEST_ENVIRONMENT_ID }}
+      TEST_BACKEND_SERVICE_ID: ${{ secrets.RAILWAY_TEST_BACKEND_SERVICE_ID }}
+      TEST_FRONTEND_SERVICE_ID: ${{ secrets.RAILWAY_TEST_FRONTEND_SERVICE_ID }}
+      PROD_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+      PROD_BACKEND_SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE_ID }}
+      PROD_FRONTEND_SERVICE_ID: ${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }}
+    steps:
+      - name: Redeploy backend + frontend (re-pull :latest)
+        run: |
+          case "$STAGE" in
+            test)
+              ENVIRONMENT_ID=$TEST_ENVIRONMENT_ID
+              BACKEND_SERVICE_ID=$TEST_BACKEND_SERVICE_ID
+              FRONTEND_SERVICE_ID=$TEST_FRONTEND_SERVICE_ID
+              ;;
+            production)
+              ENVIRONMENT_ID=$PROD_ENVIRONMENT_ID
+              BACKEND_SERVICE_ID=$PROD_BACKEND_SERVICE_ID
+              FRONTEND_SERVICE_ID=$PROD_FRONTEND_SERVICE_ID
+              ;;
+            *)
+              echo "Unknown stage: $STAGE" >&2; exit 1 ;;
+          esac
+          for v in ENVIRONMENT_ID BACKEND_SERVICE_ID FRONTEND_SERVICE_ID; do
+            [ -n "${!v}" ] || { echo "Missing $v secret for stage $STAGE" >&2; exit 1; }
+          done
+
+          redeploy() {
+            local label="$1" service_id="$2" resp
+            resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -nc --arg e "$ENVIRONMENT_ID" --arg s "$service_id" \
+                '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
+            echo "$resp"
+            echo "$resp" | jq -e '.errors == null' >/dev/null \
+              || { echo "Railway $STAGE $label redeploy failed"; return 1; }
+          }
+          redeploy backend "$BACKEND_SERVICE_ID"
+          redeploy frontend "$FRONTEND_SERVICE_ID"

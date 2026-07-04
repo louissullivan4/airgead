@@ -142,8 +142,8 @@ npm run lint      # lint both workspaces
 
 On every push to `main`, [GitHub Actions](.github/workflows/ci.yml) lints, tests,
 and builds the Docker images to GHCR, runs database migrations, then redeploys the
-backend and frontend on Railway. See [`docs/runbook-production.md`](docs/runbook-production.md).
+backend and frontend on Railway.
 
 ## License
 
-Private project — all rights reserved.
+Private project - all rights reserved.

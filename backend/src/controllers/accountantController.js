@@ -130,9 +130,14 @@ const toCsv = (expenses, capitalIds = new Set()) => {
 // zip (default): reuses the existing Excel + receipt-image archive path, sourced
 // from the client org. csv: the same rows as a flat CSV (no images).
 const exportClient = async (req, res) => {
-    const { clientOrgId } = req.params;
+    // clientOrgId and year end up in filesystem paths (and the CSV filename
+    // header) - accept integers only.
+    const clientOrgId = Number.parseInt(req.params.clientOrgId, 10);
     const format = (req.query.format || 'zip').toLowerCase();
-    const year = req.query.year || TAX_YEAR();
+    const year = Number.parseInt(req.query.year, 10) || TAX_YEAR();
+    if (!Number.isInteger(clientOrgId)) {
+        return res.status(400).json({ error: 'Invalid client organisation id.' });
+    }
 
     try {
         if (!(await assertClientAccess(req, res, clientOrgId))) return;
