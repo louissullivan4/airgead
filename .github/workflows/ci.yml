@@ -63,7 +63,6 @@ jobs:
           key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - if: steps.root-cache.outputs.cache-hit != 'true'
         run: npm ci
-      # Backend jest suite.
       - run: npm test
 
   build-frontend:
@@ -149,45 +148,40 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
-  # ── Run DB migrations, then redeploy on Railway ───────────────────────────
-
-  migrate:
-    name: Run Migrations
+  migrate-test:
+    name: Run Migrations (test)
     if: github.event_name == 'push'
     needs: [docker-backend]
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - uses: actions/cache@v4
-        id: root-cache
-        with:
-          path: node_modules
-          key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - if: steps.root-cache.outputs.cache-hit != 'true'
-        run: npm ci
-      - run: npm run migrate:up --workspace=backend
-        env:
-          DB_URL: ${{ secrets.DB_URL }}
+    uses: ./.github/workflows/db-migrate.yml
+    with:
+      stage: test
+      db-url-secret: TEST_DB_URL
+    secrets: inherit
 
   deploy-test:
     name: Deploy to Railway (test)
     if: github.event_name == 'push'
-    needs: [docker-backend, docker-frontend, migrate]
+    needs: [docker-backend, docker-frontend, migrate-test]
     uses: ./.github/workflows/railway-redeploy.yml
     with:
       stage: test
       secret-prefix: RAILWAY_TEST
     secrets: inherit
 
+  migrate-prod:
+    name: Run Migrations (production)
+    if: github.event_name == 'push'
+    needs: [deploy-test]
+    uses: ./.github/workflows/db-migrate.yml
+    with:
+      stage: production
+      db-url-secret: PROD_DB_URL
+    secrets: inherit
+
   deploy-prod:
     name: Deploy to Railway (production)
     if: github.event_name == 'push'
-    needs: [deploy-test]
+    needs: [migrate-prod]
     uses: ./.github/workflows/railway-redeploy.yml
     with:
       stage: production

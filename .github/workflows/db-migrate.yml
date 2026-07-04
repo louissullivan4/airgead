@@ -1,0 +1,38 @@
+name: DB Migrate
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        description: 'Display label for this stage (test / production)'
+        required: true
+        type: string
+      db-url-secret:
+        description: 'Name of the secret holding the database URL (TEST_DB_URL / PROD_DB_URL)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Migrate ${{ inputs.stage }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - uses: actions/cache@v4
+        id: root-cache
+        with:
+          path: node_modules
+          key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: steps.root-cache.outputs.cache-hit != 'true'
+        run: npm ci
+      - run: npm run migrate:up --workspace=backend
+        env:
+          DB_URL: ${{ secrets[inputs.db-url-secret] }}
