@@ -176,17 +176,3 @@ jobs:
       - run: npm run migrate:up --workspace=backend
         env:
           DB_URL: ${{ secrets.DB_URL }}
-
-  deploy:
-    name: Deploy to Railway
-    if: github.event_name == 'push'
-    needs: [docker-backend, docker-frontend, migrate]
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      # Each Railway service must be set to pull its GHCR image (…/backend:latest,
-      # …/frontend:latest). This step just tells Railway to redeploy that image.
-      - name: Trigger backend redeploy
-        run: curl -fsSL -X POST "${{ secrets.RAILWAY_BACKEND_DEPLOY_HOOK }}"
-      - name: Trigger frontend redeploy
-        run: curl -fsSL -X POST "${{ secrets.RAILWAY_FRONTEND_DEPLOY_HOOK }}"

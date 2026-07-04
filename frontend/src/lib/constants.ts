@@ -12,3 +12,8 @@ export const AUTH_PATHS = ["/login", "/signup", "/forgot-password", "/reset-pass
 // switches. Inlined at build time (NEXT_PUBLIC_*), safe in client + edge runtimes.
 export const OCR_AUTOFILL_ENABLED =
   process.env.NEXT_PUBLIC_OCR_AUTOFILL_ENABLED === "true";
+
+// Sage export feature flag. Mirror of the backend SAGE_ENABLED switch: when
+// false no Sage UI renders (Settings card, Export-to-Sage actions). Inlined at
+// build time (NEXT_PUBLIC_*), safe in client + edge runtimes.
+export const SAGE_ENABLED = process.env.NEXT_PUBLIC_SAGE_ENABLED === "true";

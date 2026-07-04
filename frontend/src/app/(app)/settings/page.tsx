@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { OrgCategoriesEditor } from "@/components/org-categories-editor";
 import { BillingCard } from "@/components/billing-card";
+import { SageCard } from "@/components/sage-card";
 import {
   Card,
   CardContent,
@@ -359,6 +360,8 @@ export default function SettingsPage() {
       )}
 
       <BillingCard isOwner={!!isOwner} />
+
+      <SageCard isOwner={!!isOwner} org={org} />
 
       <Card>
         <CardHeader>

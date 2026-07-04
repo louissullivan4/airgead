@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Download, Receipt, Search } from "lucide-react";
+import { ArrowLeft, Download, Receipt, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api, amountOf, isIncome, type Expense, type TaxSummary } from "@/lib/api";
+import { SAGE_ENABLED } from "@/lib/constants";
 import { TransactionsTable, type SortKey } from "@/components/transactions-table";
 import { TransactionList } from "@/components/transaction-list";
 import { TaxSummaryView } from "@/components/tax-summary-view";
+import { SageExportDialog } from "@/components/sage-export-dialog";
 import {
   Select,
   SelectContent,
@@ -41,6 +43,7 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [sageOpen, setSageOpen] = useState(false);
 
   // The client's tax picture (Form 11 / capital allowances / VAT), per year.
   const [view, setView] = useState<View>("Transactions");
@@ -195,6 +198,12 @@ export default function ClientDetailPage() {
             {exporting ? <Spinner /> : <Download />}
             {exporting ? "Exporting…" : "Export"}
           </Button>
+          {SAGE_ENABLED && (
+            <Button variant="outline" size="sm" onClick={() => setSageOpen(true)}>
+              <Upload />
+              Export to Sage
+            </Button>
+          )}
           <Button asChild variant="ghost" size="sm">
             <Link href="/clients">
               <ArrowLeft />
@@ -203,6 +212,13 @@ export default function ClientDetailPage() {
           </Button>
         </div>
       </div>
+
+      <SageExportDialog
+        open={sageOpen}
+        onOpenChange={setSageOpen}
+        client={{ id: clientOrgId, name: clientName || "client" }}
+        year={TAX_YEAR}
+      />
 
       <Segmented
         value={view}

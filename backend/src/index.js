@@ -9,6 +9,7 @@ const fileRoutes = require('./routes/fileRoutes');
 const assetRoutes = require('./routes/assetRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const billingRoutes = require('./routes/billingRoutes');
+const sageRoutes = require('./routes/sageRoutes');
 const billingController = require('./controllers/billingController');
 const healthController = require('./controllers/healthController');
 const injectPool = require('./middlewares/poolMiddleware');
@@ -106,6 +107,8 @@ app.use('/files', fileRoutes);
 app.use('/assets', assetRoutes);
 app.use('/reports', reportRoutes);
 app.use('/billing', billingRoutes);
+// Feature-flagged: everything under /sage 404s unless SAGE_ENABLED=true.
+app.use('/sage', sageRoutes);
 
 // Sentry's error handler sees exceptions first (captures + re-throws to ours).
 if (Sentry) {

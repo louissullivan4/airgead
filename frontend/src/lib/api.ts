@@ -191,6 +191,25 @@ export const api = {
         body: JSON.stringify({}),
       }),
   },
+  // Sage Business Cloud export (feature-flagged; the backend 404s everything
+  // under /sage unless SAGE_ENABLED=true). Connection is per practice org.
+  sage: {
+    /** Connection + config state driving the Settings card. */
+    status: () => request<SageStatus>("/sage/status"),
+    /** Owner-only: Sage consent URL - leave via window.location.href. */
+    connect: () =>
+      request<{ url: string }>("/sage/connect", { method: "POST", body: JSON.stringify({}) }),
+    /** Owner-only: forget the stored connection (local delete). */
+    disconnect: () => request<void>("/sage/connection", { method: "DELETE" }),
+    /** Live lookups for the export dialog (any accountant in the practice). */
+    businesses: () => request<SageOption[]>("/sage/businesses"),
+    bankAccounts: (businessId: string) =>
+      request<SageOption[]>(`/sage/businesses/${businessId}/bank-accounts`),
+    ledgerAccounts: (businessId: string) =>
+      request<SageOption[]>(`/sage/businesses/${businessId}/ledger-accounts`),
+    taxRates: (businessId: string) =>
+      request<SageOption[]>(`/sage/businesses/${businessId}/tax-rates`),
+  },
   organisations: {
     get: (id: string) => request<Organisation>(`/organisations/${id}`),
     /** Effective category tree for the org plus the pristine type `defaults`. */
@@ -243,6 +262,15 @@ export const api = {
       request<void>(`/organisations/${orgId}/invite-client`, {
         method: "POST",
         body: JSON.stringify({ email }),
+      }),
+    /** Remembered Sage mapping for a client (+ whether the practice is connected). */
+    getSageExportSettings: (clientOrgId: string) =>
+      request<SageClientSettings>(`/accountant/clients/${clientOrgId}/sage-settings`),
+    /** Push a client's tax year into Sage; returns a created/skipped/failed summary. */
+    exportClientToSage: (clientOrgId: string, data: SageExportRequest) =>
+      request<SageExportResult>(`/accountant/clients/${clientOrgId}/sage-export`, {
+        method: "POST",
+        body: JSON.stringify(data),
       }),
   },
   // Platform super-admin surface. Every route is super_admin-gated server-side.
@@ -340,6 +368,64 @@ export interface BillingStatus {
   tierInfo: { key: string; label: string; blurb: string };
   /** Practices only: active client seats being paid for. */
   seatCount?: number;
+}
+
+// --- Sage export ------------------------------------------------------------
+
+/** GET /sage/status - drives the Settings Sage card. */
+export interface SageStatus {
+  enabled: boolean;
+  /** Whether Sage credentials + token key exist server-side. */
+  configured: boolean;
+  connected: boolean;
+  connectionStatus: "active" | "expired" | null;
+  connectedAt: string | null;
+  isPractice: boolean;
+}
+
+/** A Sage dropdown option (business, bank account, ledger account, tax rate). */
+export interface SageOption {
+  id: string;
+  displayed_as: string;
+}
+
+/** Body of POST /accountant/clients/:id/sage-export. Names ride along for prefill display. */
+export interface SageExportRequest {
+  year: number;
+  businessId: string;
+  businessName?: string;
+  bankAccountId: string;
+  bankAccountName?: string;
+  expenseLedgerAccountId: string;
+  expenseLedgerAccountName?: string;
+  incomeLedgerAccountId: string;
+  incomeLedgerAccountName?: string;
+  taxRateId?: string;
+}
+
+/** Per-run outcome summary returned by the Sage export. */
+export interface SageExportResult {
+  total: number;
+  created: number;
+  skipped: number;
+  failed: number;
+  failures: { expenseId: string; title: string; error: string }[];
+}
+
+/** GET /accountant/clients/:id/sage-settings - remembered mapping for prefill. */
+export interface SageClientSettings {
+  connected: boolean;
+  settings: {
+    sage_business_id: string;
+    sage_business_name: string | null;
+    bank_account_id: string;
+    bank_account_name: string | null;
+    expense_ledger_account_id: string;
+    expense_ledger_account_name: string | null;
+    income_ledger_account_id: string;
+    income_ledger_account_name: string | null;
+    tax_rate_id: string | null;
+  } | null;
 }
 
 // --- Capital assets & tax summary (Phase 5) --------------------------------

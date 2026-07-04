@@ -19,6 +19,7 @@ const repoRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' })
 
 const ALLOWED = [
     'docs/rename-runbook.md',
+    'docs/qa-report.md',         // QA report documenting the rename work
     'backend/src/config/brand.js',
     'frontend/src/lib/brand.ts',
     'README.md',                 // single "formerly EquiLedger" note

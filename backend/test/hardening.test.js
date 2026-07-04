@@ -62,6 +62,34 @@ describe('validateEnv', () => {
         const { warnings } = validateEnv({ ...goodEnv, BILLING_ENFORCED: 'true' });
         expect(warnings.some((w) => w.includes('STRIPE_SECRET_KEY'))).toBe(true);
     });
+
+    it('SAGE_ENABLED without client credentials warns (502 keeps the app safe)', () => {
+        const { warnings } = validateEnv({
+            ...goodEnv, SAGE_ENABLED: 'true', TOKEN_ENCRYPTION_KEY: 'a'.repeat(64),
+        });
+        expect(warnings.some((w) => w.includes('SAGE_CLIENT_ID'))).toBe(true);
+    });
+
+    it('SAGE_ENABLED without TOKEN_ENCRYPTION_KEY is fatal in production, a warning in dev', () => {
+        const sageEnv = { ...goodEnv, SAGE_ENABLED: 'true', SAGE_CLIENT_ID: 'id', SAGE_CLIENT_SECRET: 's' };
+        expect(validateEnv(sageEnv).fatal.some((f) => f.includes('TOKEN_ENCRYPTION_KEY'))).toBe(true);
+        const dev = validateEnv({ ...sageEnv, NODE_ENV: 'development' });
+        expect(dev.fatal).toEqual([]);
+        expect(dev.warnings.some((w) => w.includes('TOKEN_ENCRYPTION_KEY'))).toBe(true);
+    });
+
+    it('a malformed TOKEN_ENCRYPTION_KEY is flagged', () => {
+        const { fatal } = validateEnv({
+            ...goodEnv, SAGE_ENABLED: 'true', SAGE_CLIENT_ID: 'id', SAGE_CLIENT_SECRET: 's',
+            TOKEN_ENCRYPTION_KEY: 'too-short',
+        });
+        expect(fatal.some((f) => f.includes('64 hex'))).toBe(true);
+    });
+
+    it('with the Sage flag off, no Sage checks fire', () => {
+        const { fatal, warnings } = validateEnv(goodEnv);
+        expect([...fatal, ...warnings].some((m) => m.includes('SAGE') || m.includes('TOKEN_ENCRYPTION_KEY'))).toBe(false);
+    });
 });
 
 describe('strict rate limiter', () => {

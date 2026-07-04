@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Download, MoreHorizontal, Search, UserCog, UserPlus } from "lucide-react";
+import { Briefcase, Download, MoreHorizontal, Search, Upload, UserCog, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatCurrency, type ClientSummary, type OrgMember } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { ORG_CATEGORIES } from "@/lib/org";
+import { SAGE_ENABLED } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { InviteDialog } from "@/components/invite-dialog";
+import { SageExportDialog } from "@/components/sage-export-dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +106,7 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [revoking, setRevoking] = useState<ClientSummary | null>(null);
+  const [sageClient, setSageClient] = useState<ClientSummary | null>(null);
 
   // Reassignment (admin only).
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -303,6 +306,12 @@ export default function ClientsPage() {
                             <Download />
                             Export
                           </DropdownMenuItem>
+                          {SAGE_ENABLED && (
+                            <DropdownMenuItem onSelect={() => setSageClient(c)}>
+                              <Upload />
+                              Export to Sage
+                            </DropdownMenuItem>
+                          )}
                           {isAdmin && (
                             <DropdownMenuItem
                               onSelect={() => {
@@ -380,6 +389,13 @@ export default function ClientsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SageExportDialog
+        open={Boolean(sageClient)}
+        onOpenChange={(o) => !o && setSageClient(null)}
+        client={sageClient}
+        year={TAX_YEAR}
+      />
 
       <AlertDialog open={Boolean(revoking)} onOpenChange={(o) => !o && setRevoking(null)}>
         <AlertDialogContent>

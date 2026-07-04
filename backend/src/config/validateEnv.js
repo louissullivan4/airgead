@@ -33,6 +33,18 @@ const validateEnv = (env = process.env) => {
     if (env.BILLING_ENFORCED === 'true' && !env.STRIPE_SECRET_KEY) {
         warnings.push('BILLING_ENFORCED is true but STRIPE_SECRET_KEY is not set - expired orgs will have no way to pay.');
     }
+    if (env.SAGE_ENABLED === 'true') {
+        if (!env.SAGE_CLIENT_ID || !env.SAGE_CLIENT_SECRET) {
+            warnings.push('SAGE_ENABLED is true but SAGE_CLIENT_ID/SAGE_CLIENT_SECRET are not set - Sage routes will answer 502.');
+        }
+        // Unlike missing client creds (502 keeps the app safe), a missing or
+        // malformed encryption key would only surface at the first token write.
+        if (!env.TOKEN_ENCRYPTION_KEY) {
+            problem('SAGE_ENABLED is true but TOKEN_ENCRYPTION_KEY is not set - Sage tokens cannot be stored securely.');
+        } else if (!/^[0-9a-fA-F]{64}$/.test(env.TOKEN_ENCRYPTION_KEY)) {
+            problem('TOKEN_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes) - generate with: openssl rand -hex 32');
+        }
+    }
     if (production && !env.CORS_ORIGINS) {
         warnings.push('CORS_ORIGINS is not set - the API will accept cross-origin requests from anywhere.');
     }
