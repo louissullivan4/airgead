@@ -13,6 +13,8 @@ const rateLimit = require('express-rate-limit');
 const WINDOW_MS = 15 * 60 * 1000;
 const GLOBAL_LIMIT = 300;
 const STRICT_LIMIT = 10;
+const HEALTH_WINDOW_MS = 60 * 1000;
+const HEALTH_LIMIT = 60;
 
 const buildGlobalLimiter = (overrides = {}) =>
     rateLimit({
@@ -36,4 +38,20 @@ const buildStrictLimiter = (overrides = {}) =>
         ...overrides,
     });
 
-module.exports = { buildGlobalLimiter, buildStrictLimiter, WINDOW_MS, GLOBAL_LIMIT, STRICT_LIMIT };
+// Health probes must effectively never be throttled, but the endpoint still
+// does a DB round-trip, so it gets its own per-IP ceiling far above any real
+// probe cadence (probes fire every few seconds; this allows one per second).
+// Unlike the other limiters this one is mounted directly on the route, so it
+// self-skips under test to keep the mocked suites deterministic.
+const buildHealthLimiter = (overrides = {}) =>
+    rateLimit({
+        windowMs: HEALTH_WINDOW_MS,
+        limit: HEALTH_LIMIT,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        skip: () => process.env.NODE_ENV === 'test',
+        message: { error: 'Too many requests - please slow down.' },
+        ...overrides,
+    });
+
+module.exports = { buildGlobalLimiter, buildStrictLimiter, buildHealthLimiter, WINDOW_MS, GLOBAL_LIMIT, STRICT_LIMIT, HEALTH_WINDOW_MS, HEALTH_LIMIT };

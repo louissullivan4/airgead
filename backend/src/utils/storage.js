@@ -27,8 +27,9 @@ const PUBLIC_BACKEND_URL = (process.env.PUBLIC_BACKEND_URL || 'http://localhost:
 // storage root (path-traversal guard for token-supplied keys).
 const localPathFor = (objectPath) => {
     const root = path.resolve(LOCAL_STORAGE_DIR);
-    const full = path.resolve(root, objectPath);
-    if (full !== root && !full.startsWith(root + path.sep)) {
+    const full = path.resolve(root, String(objectPath));
+    const relative = path.relative(root, full);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
         throw new Error('Invalid object path.');
     }
     return full;

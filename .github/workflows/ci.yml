@@ -16,6 +16,11 @@ on:
       - '.gitignore'
       - 'LICENSE'
 
+# Default GITHUB_TOKEN scope for every job: read-only. Jobs that push images
+# grant themselves packages:write explicitly.
+permissions:
+  contents: read
+
 # Cancel in-progress runs for PRs (new push supersedes); never cancel a main deploy mid-flight.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

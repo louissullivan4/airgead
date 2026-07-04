@@ -374,8 +374,12 @@ const deleteExpense = async (req, res) => {
 
 const getExcelDownloadByUserIdAndYear = async (req, res) => {
     const pool = req.pool;
-    const userId = req.params.id;
-    const year = req.params.year;
+    // Both params end up in filesystem paths below - accept integers only.
+    const userId = Number.parseInt(req.params.id, 10);
+    const year = Number.parseInt(req.params.year, 10);
+    if (!Number.isInteger(userId) || !Number.isInteger(year)) {
+        return res.status(400).json({ error: 'Invalid user id or year.' });
+    }
 
     const timestamp = Date.now();
     const tempDir = path.join(__dirname, '..', 'temp', `download_${userId}_${year}_${timestamp}`);
