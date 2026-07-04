@@ -155,7 +155,6 @@ jobs:
     uses: ./.github/workflows/db-migrate.yml
     with:
       stage: test
-      db-url-secret: TEST_DB_URL
     secrets: inherit
 
   deploy-test:
@@ -165,7 +164,6 @@ jobs:
     uses: ./.github/workflows/railway-redeploy.yml
     with:
       stage: test
-      secret-prefix: RAILWAY_TEST
     secrets: inherit
 
   migrate-prod:
@@ -175,7 +173,6 @@ jobs:
     uses: ./.github/workflows/db-migrate.yml
     with:
       stage: production
-      db-url-secret: PROD_DB_URL
     secrets: inherit
 
   deploy-prod:
@@ -185,5 +182,4 @@ jobs:
     uses: ./.github/workflows/railway-redeploy.yml
     with:
       stage: production
-      secret-prefix: RAILWAY
     secrets: inherit

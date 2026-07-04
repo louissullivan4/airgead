@@ -4,11 +4,7 @@ on:
   workflow_call:
     inputs:
       stage:
-        description: 'Display label for this stage (test / production)'
-        required: true
-        type: string
-      db-url-secret:
-        description: 'Name of the secret holding the database URL (TEST_DB_URL / PROD_DB_URL)'
+        description: 'Deployment stage: test or production'
         required: true
         type: string
 
@@ -33,6 +29,18 @@ jobs:
           key: root-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - if: steps.root-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run migrate:up --workspace=backend
+      # Secrets are referenced literally (never via a computed key) so the job
+      # receives only the two DB URLs, not the whole secrets context.
+      - run: |
+          case "$STAGE" in
+            test)       DB_URL=$TEST_DB_URL ;;
+            production) DB_URL=$PROD_DB_URL ;;
+            *) echo "Unknown stage: $STAGE" >&2; exit 1 ;;
+          esac
+          [ -n "$DB_URL" ] || { echo "No database URL secret set for stage $STAGE" >&2; exit 1; }
+          export DB_URL
+          npm run migrate:up --workspace=backend
         env:
-          DB_URL: ${{ secrets[inputs.db-url-secret] }}
+          STAGE: ${{ inputs.stage }}
+          TEST_DB_URL: ${{ secrets.TEST_DB_URL }}
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
