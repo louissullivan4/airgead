@@ -176,3 +176,36 @@ jobs:
       - run: npm run migrate:up --workspace=backend
         env:
           DB_URL: ${{ secrets.DB_URL }}
+
+  deploy:
+    name: Deploy to Railway
+    if: github.event_name == 'push'
+    needs: [docker-backend, docker-frontend, migrate]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+    steps:
+      - name: Redeploy backend (re-pull :latest)
+        env:
+          SERVICE_ID: ${{ secrets.RAILWAY_BACKEND_SERVICE_ID }}
+        run: |
+          resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg e "$RAILWAY_ENVIRONMENT_ID" --arg s "$SERVICE_ID" \
+              '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
+          echo "$resp"
+          echo "$resp" | jq -e '.errors == null' >/dev/null || { echo "Railway backend redeploy failed"; exit 1; }
+      - name: Redeploy frontend (re-pull :latest)
+        env:
+          SERVICE_ID: ${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }}
+        run: |
+          resp=$(curl -fsSL -X POST https://backboard.railway.com/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg e "$RAILWAY_ENVIRONMENT_ID" --arg s "$SERVICE_ID" \
+              '{query:"mutation($e:String!,$s:String!){serviceInstanceRedeploy(environmentId:$e,serviceId:$s)}",variables:{e:$e,s:$s}}')")
+          echo "$resp"
+          echo "$resp" | jq -e '.errors == null' >/dev/null || { echo "Railway frontend redeploy failed"; exit 1; }
