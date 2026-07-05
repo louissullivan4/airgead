@@ -1,0 +1,3 @@
+ignored:
+  # Pinned apk packages disappear from Alpine mirrors and break builds.
+  - DL3018
