@@ -106,6 +106,31 @@ jobs:
         with:
           dockerfile: ${{ matrix.dockerfile }}
 
+  # The workspace root lock and the standalone backend/frontend locks (used by
+  # the Docker builds, which only run post-merge) can drift when a dependency
+  # bump updates one but not the other. Validate all three on every PR, checking
+  # the standalone locks in isolation exactly as their Docker build contexts do.
+  lockfile-sync:
+    name: Lockfile sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: root workspace lock
+        run: npm ci --dry-run --ignore-scripts
+      - name: backend standalone lock
+        run: |
+          work=$(mktemp -d)
+          cp backend/package.json backend/package-lock.json "$work"
+          cd "$work" && npm ci --dry-run --ignore-scripts
+      - name: frontend standalone lock
+        run: |
+          work=$(mktemp -d)
+          cp frontend/package.json frontend/package-lock.json "$work"
+          cd "$work" && npm ci --dry-run --ignore-scripts
+
   # Blocks PRs that introduce a dependency with a known vulnerability.
   dependency-review:
     name: Dependency Review
