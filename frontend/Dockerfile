@@ -31,7 +31,15 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+# apk upgrade pulls Alpine security patches the base image hasn't been rebuilt
+# with yet (Trivy flags libssl3/libcrypto3); npm/yarn are removed because the
+# standalone server only needs the node binary and npm's bundled deps carry
+# their own CVEs.
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+       /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn* \
+    && addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 # Standalone output bundles a minimal node_modules + server.js; static assets
 # and public/ (incl. the Serwist-generated sw.js) are copied alongside it.
 COPY --from=builder /app/public ./public
