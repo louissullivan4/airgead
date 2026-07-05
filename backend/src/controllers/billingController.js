@@ -34,12 +34,7 @@ const getStatus = async (req, res) => {
         if (!entitlement) {
             return res.status(404).json({ error: 'Organisation not found.' });
         }
-        // Practices manage seats, so their card shows the live seat count.
-        let seatCount;
-        if (entitlement.isPractice) {
-            seatCount = await billingModel.countActiveSeats(req.pool, req.user.orgId);
-        }
-        // Live Stripe prices so the Settings card shows the real figure, never a
+        // Live Stripe price so the Settings card shows the real figure, never a
         // drifting hardcoded one. Cached; null when Stripe is unconfigured.
         const prices = await priceService.getLivePrices();
         return res.status(200).json({
@@ -48,8 +43,6 @@ const getStatus = async (req, res) => {
             trialDays: TRIAL_DAYS,
             tierInfo: TIERS[entitlement.tier] || TIERS.trial,
             premium: prices.premium,
-            seat: prices.seat,
-            ...(seatCount === undefined ? {} : { seatCount }),
             ...entitlement,
         });
     } catch (error) {
@@ -58,9 +51,9 @@ const getStatus = async (req, res) => {
     }
 };
 
-// POST /billing/checkout-session (owner-only). A solo org subscribes for
-// itself (solo price, qty 1); a practice subscribes per SEAT (seat price,
-// qty = its active client links, min 1 so checkout is never empty).
+// POST /billing/checkout-session (owner-only). Every paying org - a solo/
+// business or a practice's client - subscribes for itself at the monthly solo
+// price, qty 1. Accountancy practices are free and never check out.
 const createCheckoutSession = async (req, res) => {
     const stripe = stripeClient.getStripeClient();
     if (!stripe) {
@@ -70,14 +63,16 @@ const createCheckoutSession = async (req, res) => {
         const org = await organisationModel.getOrgById(req.pool, req.user.orgId);
         if (!org) return res.status(404).json({ error: 'Organisation not found.' });
 
-        const isPractice = Boolean(org.is_accountant_practice);
-        const priceId = isPractice ? process.env.STRIPE_PRICE_SEAT : process.env.STRIPE_PRICE_SOLO;
+        // A practice (approved or pending) is free - there is nothing to buy.
+        if (org.is_accountant_practice || org.practice_status === 'pending') {
+            return res.status(400).json({ error: 'Practice accounts are free - there is nothing to subscribe to.' });
+        }
+
+        const priceId = process.env.STRIPE_PRICE_SOLO;
         if (!priceId) {
             return res.status(502).json({ error: 'Billing is not configured on this server.' });
         }
-        const quantity = isPractice
-            ? Math.max(1, await billingModel.countActiveSeats(req.pool, org.id))
-            : 1;
+        const quantity = 1;
 
         let customerId = org.stripe_customer_id;
         if (!customerId) {
@@ -102,7 +97,7 @@ const createCheckoutSession = async (req, res) => {
             cancel_url: `${frontendUrl()}/settings?billing=canceled`,
         });
 
-        logger.info('Created checkout session', { orgId: org.id, isPractice, quantity });
+        logger.info('Created checkout session', { orgId: org.id, quantity });
         return res.status(200).json({ url: session.url });
     } catch (error) {
         logger.error('Error creating checkout session', { orgId: req.user && req.user.orgId, error: error.message });
@@ -215,10 +210,10 @@ const handleWebhook = async (req, res) => {
 
 // GET /billing/plans - PUBLIC (no auth): the marketing pricing + landing pages
 // render entirely from this. Returns whether billing is enforced, the trial
-// length, and the live Stripe prices (premium = self-serve, seat = per client
-// seat). With enforcement off ("complete demo mode") the pages show the free
-// story; the prices are still returned so the paid copy is ready to render the
-// moment the flag flips. Never throws to the client - degrades to null prices.
+// length, and the live self-serve monthly price (premium). With enforcement off
+// ("complete demo mode") the pages show the free story; the price is still
+// returned so the paid copy is ready to render the moment the flag flips. Never
+// throws to the client - degrades to a null price.
 const getPlans = async (req, res) => {
     try {
         const prices = await priceService.getLivePrices();
@@ -226,7 +221,6 @@ const getPlans = async (req, res) => {
             enforced: isBillingEnforced(),
             trialDays: TRIAL_DAYS,
             premium: prices.premium,
-            seat: prices.seat,
         });
     } catch (error) {
         logger.error('Error building plans response', { error: error.message });
@@ -234,7 +228,6 @@ const getPlans = async (req, res) => {
             enforced: isBillingEnforced(),
             trialDays: TRIAL_DAYS,
             premium: null,
-            seat: null,
         });
     }
 };

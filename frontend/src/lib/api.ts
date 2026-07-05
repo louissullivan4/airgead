@@ -192,7 +192,7 @@ export const api = {
   billing: {
     /** The caller org's entitlement + whether billing is enforced platform-wide. */
     status: () => request<BillingStatus>("/billing/status"),
-    /** Owner-only: Stripe Checkout URL (solo price, or per-seat for practices). */
+    /** Owner-only: Stripe Checkout URL (monthly solo price; practices are free). */
     checkout: () =>
       request<{ url: string }>("/billing/checkout-session", {
         method: "POST",
@@ -265,6 +265,12 @@ export const api = {
     /** Revoke the practice's access to a client org. */
     revokeClient: (clientOrgId: string) =>
       request<void>(`/accountant/clients/${clientOrgId}/link`, { method: "DELETE" }),
+    /** Nudge a client to subscribe (emails their owner; once per day per client). */
+    remindClient: (clientOrgId: string) =>
+      request<{ message: string; alreadySent?: boolean }>(
+        `/accountant/clients/${clientOrgId}/remind`,
+        { method: "POST" },
+      ),
     /** Firm admin: reassign a client to another accountant in the firm. */
     assignClient: (clientOrgId: string, accountantUserId: string) =>
       request<void>(`/accountant/clients/${clientOrgId}/assign`, {
@@ -292,6 +298,14 @@ export const api = {
     overview: () => request<PlatformStats>("/admin/overview"),
     orgs: () => request<AdminOrg[]>("/admin/orgs"),
     users: () => request<AdminUser[]>("/admin/users"),
+    /** Accountancy practices awaiting review (self-serve applications). */
+    practiceApplications: () => request<PracticeApplication[]>("/admin/practice-applications"),
+    /** Approve or reject a practice application; approval unlocks free practice powers. */
+    setPracticeApproval: (id: string, decision: "approved" | "rejected") =>
+      request<{ message: string }>(`/admin/orgs/${id}/practice-approval`, {
+        method: "PATCH",
+        body: JSON.stringify({ decision }),
+      }),
     /** Invite a new account; kind 'accountant' provisions a firm on signup. */
     invite: (email: string, kind: "user" | "accountant") =>
       request<void>("/admin/invite", { method: "POST", body: JSON.stringify({ email, kind }) }),
@@ -370,22 +384,18 @@ export interface BillingStatus {
   active: boolean;
   tier: "trial" | "standard";
   status: "none" | "trialing" | "active" | "past_due" | "canceled" | "trial_expired";
-  reason: "practice" | "subscribed" | "covered_seat" | "trial" | "expired";
+  reason: "practice" | "subscribed" | "trial" | "expired";
   trialEndsAt: string | null;
-  /** Set when a paying practice covers this org as a seat. */
-  coveredByPracticeOrgId: string | null;
   /** Raw organisations.billing_status (a practice is always active yet may have no billing set up). */
   billingStatus: "none" | "trialing" | "active" | "past_due" | "canceled";
   isPractice: boolean;
+  /** Practice application lifecycle (drives the "under review" state). */
+  practiceStatus: "none" | "pending" | "approved" | "rejected";
   orgId: string;
   trialDays: number;
   tierInfo: { key: string; label: string; blurb: string };
-  /** Practices only: active client seats being paid for. */
-  seatCount?: number;
   /** Live Stripe price for the self-serve plan (minor units); null if unconfigured. */
   premium?: PriceInfo | null;
-  /** Live Stripe per-client-seat price a practice pays; null if unconfigured. */
-  seat?: PriceInfo | null;
 }
 
 /** A live Stripe price, surfaced for display (never used to charge). */
@@ -708,8 +718,10 @@ export interface Organisation {
   categories?: CategoryTree | null;
   owner_account_id?: string | null;
   subscription_level?: string | null;
-  /** True for accountancy practice orgs (unlocks the Clients workspace). */
+  /** True once an accountancy practice is APPROVED (unlocks client invites). */
   is_accountant_practice?: boolean;
+  /** Practice application lifecycle: 'pending' while awaiting review, 'approved' after. */
+  practice_status?: "none" | "pending" | "approved" | "rejected";
   /** Lifecycle status; a suspended org's users cannot log in. */
   status?: "active" | "suspended";
   /** VAT treatment - drives the VAT section of the tax summary. */
@@ -736,6 +748,8 @@ export interface AdminOrg {
   type: "personal" | "business";
   org_category: string;
   is_accountant_practice: boolean;
+  /** Practice application lifecycle; 'none' for non-practices. */
+  practice_status: "none" | "pending" | "approved" | "rejected";
   status: "active" | "suspended";
   member_count: string | number;
   txn_count: string | number;
@@ -743,6 +757,20 @@ export interface AdminOrg {
   income_total: string | number;
   last_activity: string | null;
   created_at: string;
+}
+
+/** A pending accountancy-practice application (GET /admin/practice-applications). */
+export interface PracticeApplication {
+  id: string;
+  name: string;
+  description: string | null;
+  country: string | null;
+  vat_number: string | null;
+  created_at: string;
+  /** Applying owner's contact, for vetting. */
+  fname: string | null;
+  sname: string | null;
+  owner_email: string | null;
 }
 
 /** A user row in the super-admin overview. */
@@ -789,6 +817,10 @@ export interface ClientSummary {
   /** Owning accountant (created_by) - shown to the firm admin. */
   created_by: string | null;
   owner_name: string | null;
+  /** Client billing state: paying, still trialing, or lapsed (a nudge candidate). */
+  billing: "active" | "trial" | "expired";
+  /** Trial deadline (ISO) - null once the client subscribes. */
+  trialEndsAt: string | null;
 }
 
 /** A node in the org category tree. A leaf (no children) is what gets stored on a transaction. */

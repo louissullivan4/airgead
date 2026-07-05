@@ -18,13 +18,12 @@ export interface PublicPlans {
   enforced: boolean;
   trialDays: number;
   premium: PriceInfo | null;
-  seat: PriceInfo | null;
 }
 
 // Safe fallback so a page always renders even if the backend is unreachable
 // (e.g. during `next build`, which runs with no backend). Defaults to demo
 // mode - the least surprising state to show if we can't confirm enforcement.
-const FALLBACK: PublicPlans = { enforced: false, trialDays: 14, premium: null, seat: null };
+const FALLBACK: PublicPlans = { enforced: false, trialDays: 14, premium: null };
 
 export async function getPublicPlans(): Promise<PublicPlans> {
   try {

@@ -36,6 +36,7 @@
     "jsonwebtoken": "^9.0.2",
     "kleur": "^4.1.5",
     "moment": "^2.30.1",
+    "node-cron": "^3.0.3",
     "node-pg-migrate": "^7.6.1",
     "nodemailer": "^9.0.1",
     "path": "^0.12.7",

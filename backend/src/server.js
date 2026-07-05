@@ -8,12 +8,18 @@ validateEnvOrExit();
 const app = require('./index');
 const logger = require('./utils/logger');
 const pool = require('./utils/db');
+const { startReminderCron } = require('./services/billing/reminderJob');
 
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => {
     logger.info(`Server running on port ${port}`);
 });
+
+// Daily trial/payment reminder sweep. Lives here (not in ./index) so importing
+// the app in tests never spins a timer; the sweep itself no-ops until billing
+// is enforced.
+startReminderCron(pool);
 
 // Graceful shutdown (Phase 6 ops): stop accepting connections, let in-flight
 // requests finish, close the pool - with a 10s hard deadline so a wedged

@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Download, MoreHorizontal, Search, Upload, UserCog, UserPlus } from "lucide-react";
+import { Bell, Briefcase, Clock, Download, MoreHorizontal, Search, Upload, UserCog, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { api, formatCurrency, type ClientSummary, type OrgMember } from "@/lib/api";
+import { api, formatCurrency, type ClientSummary, type Organisation, type OrgMember } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { ORG_CATEGORIES } from "@/lib/org";
 import { SAGE_ENABLED } from "@/lib/constants";
@@ -95,11 +95,43 @@ function ReadinessBadge({ client }: { client: ClientSummary }) {
   );
 }
 
+// The client's subscription state - each client now pays for themselves, so the
+// practice can see who is trialing/expired at a glance and nudge them.
+function billingBadgeOf(c: ClientSummary): { tone: string; dot: string; label: string; hint: string } {
+  if (c.billing === "active") {
+    return { tone: "text-success", dot: "bg-success", label: "Subscribed", hint: "Paying client" };
+  }
+  if (c.billing === "trial") {
+    const days = c.trialEndsAt
+      ? Math.max(0, Math.ceil((new Date(c.trialEndsAt).getTime() - Date.now()) / 86_400_000))
+      : 0;
+    return {
+      tone: "text-amber-600 dark:text-amber-500",
+      dot: "bg-amber-500",
+      label: days ? `Trial · ${days}d left` : "Trial ending",
+      hint: "On the 14-day free trial",
+    };
+  }
+  return { tone: "text-destructive", dot: "bg-destructive", label: "Expired", hint: "Trial ended, not subscribed" };
+}
+
+function BillingBadge({ client }: { client: ClientSummary }) {
+  const b = billingBadgeOf(client);
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${b.tone}`} title={b.hint}>
+      <span className={`size-1.5 rounded-full ${b.dot}`} />
+      {b.label}
+    </span>
+  );
+}
+
 export default function ClientsPage() {
   const { session } = useSession();
   // Firm admin (org owner) or super_admin sees all clients + can reassign.
-  const isAdmin = session?.orgRole === "owner" || session?.platformRole === "super_admin";
+  const isSuperAdmin = session?.platformRole === "super_admin";
+  const isAdmin = session?.orgRole === "owner" || isSuperAdmin;
 
+  const [org, setOrg] = useState<Organisation | null>(null);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,12 +162,34 @@ export default function ClientsPage() {
     void load();
   }, [load]);
 
+  // The caller's own org tells us whether the practice is approved yet (a
+  // pending applicant sees the "under review" state instead of the workspace).
+  useEffect(() => {
+    if (session) {
+      api.organisations.get(session.orgId).then(setOrg).catch(() => {});
+    }
+  }, [session]);
+
   // Admins need the firm roster to reassign clients between accountants.
   useEffect(() => {
     if (isAdmin && session) {
       api.organisations.members(session.orgId).then(setMembers).catch(() => {});
     }
   }, [isAdmin, session]);
+
+  // A practice still awaiting approval: no invites, no client list yet.
+  const pendingReview = !isSuperAdmin && org?.practice_status === "pending" && !org?.is_accountant_practice;
+
+  async function remindClient(c: ClientSummary) {
+    try {
+      const res = await api.accountant.remindClient(c.id);
+      toast.success(res.alreadySent ? "Already reminded today" : "Reminder sent", {
+        description: res.alreadySent ? undefined : `We emailed ${c.name} to subscribe.`,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send reminder");
+    }
+  }
 
   async function confirmReassign() {
     if (!reassigning || !assignTo) return;
@@ -191,6 +245,19 @@ export default function ClientsPage() {
     }
   }
 
+  if (pendingReview) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Clients" description="Your practice workspace." />
+        <EmptyState
+          icon={Clock}
+          title="Your practice application is under review"
+          description="We review every practice before activating it. Once you're approved you'll be able to invite clients here and manage their books - we'll email you the moment it's live. Your practice account is free."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="Clients" description="The organisations your practice oversees.">
@@ -243,6 +310,7 @@ export default function ClientsPage() {
               <tr className="border-b border-border text-xs font-medium text-muted-foreground">
                 <th className="px-3 py-2.5 text-left">Client</th>
                 <th className="px-3 py-2.5 text-left">Status</th>
+                <th className="px-3 py-2.5 text-left">Billing</th>
                 {isAdmin && <th className="px-3 py-2.5 text-left">Accountant</th>}
                 <th className="px-3 py-2.5 text-right">Expense</th>
                 <th className="px-3 py-2.5 text-right">Income</th>
@@ -270,6 +338,9 @@ export default function ClientsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3">
                       <ReadinessBadge client={c} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3">
+                      <BillingBadge client={c} />
                     </td>
                     {isAdmin && (
                       <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
@@ -306,6 +377,12 @@ export default function ClientsPage() {
                             <Download />
                             Export
                           </DropdownMenuItem>
+                          {c.billing !== "active" && (
+                            <DropdownMenuItem onSelect={() => remindClient(c)}>
+                              <Bell />
+                              Send payment reminder
+                            </DropdownMenuItem>
+                          )}
                           {SAGE_ENABLED && (
                             <DropdownMenuItem onSelect={() => setSageClient(c)}>
                               <Upload />

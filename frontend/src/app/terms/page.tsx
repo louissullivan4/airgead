@@ -51,9 +51,9 @@ export default function TermsPage() {
       <ul>
         <li>New accounts include a {TRIAL_DAYS}-day free trial of the full product.</li>
         <li>
-          Paid plans are billed monthly through Stripe: a flat price per solo organisation, or a
-          per-client-seat price for accountancy practices (seat counts adjust automatically as
-          clients are added or removed, with pro-rating).
+          After the trial, paid plans are billed monthly through Stripe at a flat price per
+          organisation. Accountancy practices are free once approved; each of their clients holds
+          their own account and subscribes directly.
         </li>
         <li>
           If a subscription lapses your account becomes <strong>read-only</strong>: everything you

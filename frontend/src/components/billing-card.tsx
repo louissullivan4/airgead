@@ -43,17 +43,17 @@ function describe(status: BillingStatus): { badge: string; tone: "default" | "de
     : 0;
   switch (status.reason) {
     case "practice":
-      return {
-        badge: "Practice",
-        tone: "default",
-        line: `Your practice account is free - you pay ${fmtPrice(status.seat, 15)}/month per active client seat.`,
-      };
-    case "covered_seat":
-      return {
-        badge: "Covered",
-        tone: "default",
-        line: "Your seat is covered by your accountant's practice - nothing for you to pay.",
-      };
+      return status.practiceStatus === "pending"
+        ? {
+            badge: "Under review",
+            tone: "default",
+            line: "Your practice application is under review - your account is free, and you'll be able to invite clients once approved.",
+          }
+        : {
+            badge: "Practice",
+            tone: "default",
+            line: "Your practice account is free. Each client you invite pays for their own subscription after a 14-day trial.",
+          };
     case "subscribed":
       return status.status === "past_due"
         ? {
@@ -155,15 +155,17 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
 
   const d = describe(status);
   // Which action makes sense: manage an existing Stripe relationship, start
-  // one, or both (a canceled org restarts with a fresh checkout).
+  // one, or both (a canceled org restarts with a fresh checkout). Practices are
+  // free and never subscribe, so they see no billing actions.
   const hasStripeHistory = status.billingStatus !== "none";
   const canRestart = !status.active && status.reason === "expired";
+  const isPractice = status.isPractice || status.practiceStatus === "pending";
   const showSubscribe =
     status.configured &&
     isOwner &&
-    status.reason !== "covered_seat" &&
+    !isPractice &&
     (!hasStripeHistory || canRestart);
-  const showManage = status.configured && isOwner && hasStripeHistory;
+  const showManage = status.configured && isOwner && !isPractice && hasStripeHistory;
 
   return (
     <Card>
@@ -178,20 +180,12 @@ function BillingCard({ isOwner }: { isOwner: boolean }) {
           <Badge variant={d.tone === "destructive" ? "destructive" : "default"}>{d.badge}</Badge>
           <span className="text-sm text-muted-foreground">{d.line}</span>
         </div>
-        {status.isPractice && status.seatCount !== undefined && (
-          <p className="text-sm text-muted-foreground">
-            {status.seatCount === 1 ? "1 active client seat" : `${status.seatCount} active client seats`} -
-            seats update automatically as you invite or revoke clients.
-          </p>
-        )}
         {(showSubscribe || showManage) && (
           <div className="flex flex-wrap gap-3">
             {showSubscribe && (
               <Button onClick={() => go("checkout")} disabled={redirecting}>
                 {redirecting ? <Spinner /> : <CreditCard />}
-                {status.isPractice
-                  ? "Set up practice billing"
-                  : `Subscribe - ${fmtPrice(status.premium, 15)}/month`}
+                {`Subscribe - ${fmtPrice(status.premium, 15)}/month`}
               </Button>
             )}
             {showManage && (

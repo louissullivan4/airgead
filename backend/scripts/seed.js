@@ -42,6 +42,8 @@ ALTER TABLE organisations ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz DEF
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS stripe_customer_id text;
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
 ALTER TABLE organisations ADD COLUMN IF NOT EXISTS billing_status text NOT NULL DEFAULT 'none';
+-- Practice approval lifecycle (see migrations/014_practice_approval.sql).
+ALTER TABLE organisations ADD COLUMN IF NOT EXISTS practice_status text NOT NULL DEFAULT 'none';
 
 CREATE TABLE IF NOT EXISTS users (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -150,6 +152,15 @@ CREATE TABLE IF NOT EXISTS accountant_org_links (
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now(),
     UNIQUE (accountant_org_id, client_org_id)
+);
+
+-- Trial/payment reminder log (see migrations/015_billing_reminders.sql).
+CREATE TABLE IF NOT EXISTS billing_reminders (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+    kind       text NOT NULL,
+    sent_at    timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (org_id, kind)
 );
 
 -- owner FK added after both tables exist; guarded so re-runs are safe.
@@ -305,9 +316,9 @@ async function main() {
       // Demo orgs are seeded as paid-up ('standard'/'active') so the demo walk
       // never trips trial banners or (post-GA-flip) the write gate.
       await client.query(
-        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice, vat_status, subscription_level, billing_status)
-         VALUES ($1,$2,$3,$4,$5,$6,'standard','active')`,
-        [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice), o.vatStatus || 'not_registered'],
+        `INSERT INTO organisations (id, name, type, org_category, is_accountant_practice, practice_status, vat_status, subscription_level, billing_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'standard','active')`,
+        [o.orgId, o.orgName, o.orgType, o.orgCategory, Boolean(o.isPractice), o.isPractice ? 'approved' : 'none', o.vatStatus || 'not_registered'],
       );
       await client.query(
         `INSERT INTO users (

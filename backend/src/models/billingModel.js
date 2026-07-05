@@ -63,19 +63,4 @@ const applySubscriptionState = async (pool, orgId, { subscriptionId, billingStat
     }
 };
 
-// The seat quantity a practice pays for: its ACTIVE client links. Revoked
-// links stop costing immediately.
-const countActiveSeats = async (pool, practiceOrgId) => {
-    try {
-        const result = await pool.query(
-            "SELECT count(*)::int AS seats FROM accountant_org_links WHERE accountant_org_id = $1 AND status = 'active'",
-            [practiceOrgId]
-        );
-        return (result.rows[0] && result.rows[0].seats) || 0;
-    } catch (error) {
-        logger.error('Error counting active seats', { practiceOrgId, error: error.message });
-        throw error;
-    }
-};
-
-module.exports = { setStripeCustomerId, getOrgByStripeCustomerId, applySubscriptionState, countActiveSeats };
+module.exports = { setStripeCustomerId, getOrgByStripeCustomerId, applySubscriptionState };

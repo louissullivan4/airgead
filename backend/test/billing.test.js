@@ -18,10 +18,10 @@ const PAST = new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString();
 const orgRow = (overrides = {}) => ({
     id: 'org-1',
     is_accountant_practice: false,
+    practice_status: 'none',
     subscription_level: 'trial',
     billing_status: 'none',
     trial_ends_at: FUTURE,
-    covered_by_practice_org_id: null,
     ...overrides,
 });
 
@@ -37,10 +37,16 @@ describe('getEffectiveSubscription', () => {
         expect(await getEffectiveSubscription(poolWith([]), 'nope')).toBeNull();
     });
 
-    it('a practice org is always active - the seats pay, not the practice', async () => {
+    it('an approved practice org is always active and free (its clients pay, not it)', async () => {
         const ent = await getEffectiveSubscription(
-            poolWith([orgRow({ is_accountant_practice: true, trial_ends_at: PAST })]), 'org-1');
+            poolWith([orgRow({ is_accountant_practice: true, practice_status: 'approved', trial_ends_at: PAST })]), 'org-1');
         expect(ent).toEqual(expect.objectContaining({ active: true, tier: 'standard', reason: 'practice' }));
+    });
+
+    it('a practice still PENDING review gets grace: active and never dunned', async () => {
+        const ent = await getEffectiveSubscription(
+            poolWith([orgRow({ is_accountant_practice: false, practice_status: 'pending', trial_ends_at: PAST })]), 'org-1');
+        expect(ent).toEqual(expect.objectContaining({ active: true, reason: 'practice', practiceStatus: 'pending' }));
     });
 
     it('an org with its own active subscription is active standard', async () => {
@@ -55,17 +61,9 @@ describe('getEffectiveSubscription', () => {
         expect(ent).toEqual(expect.objectContaining({ active: true, reason: 'subscribed', status: 'past_due' }));
     });
 
-    it('a client of a paying practice is an active covered seat', async () => {
-        const ent = await getEffectiveSubscription(
-            poolWith([orgRow({ trial_ends_at: PAST, covered_by_practice_org_id: 'practice-9' })]), 'org-1');
-        expect(ent).toEqual(expect.objectContaining({
-            active: true, tier: 'standard', reason: 'covered_seat', coveredByPracticeOrgId: 'practice-9',
-        }));
-    });
-
-    it('cover vanishes with the link: no covered_by + expired trial = inactive', async () => {
-        // The SQL only surfaces ACTIVE links to PAYING practices, so a revoked
-        // link (or a lapsed practice) simply returns null cover.
+    it('a client org is billed like a solo: expired trial + no subscription = inactive', async () => {
+        // Clients now pay for themselves - there is no "covered seat"; the
+        // accountant link is a pure access grant, decoupled from billing.
         const ent = await getEffectiveSubscription(poolWith([orgRow({ trial_ends_at: PAST })]), 'org-1');
         expect(ent).toEqual(expect.objectContaining({ active: false, reason: 'expired', status: 'trial_expired' }));
     });
@@ -126,7 +124,7 @@ describe('requireActiveSubscriptionForWrites', () => {
 
     it('passes an active org and attaches the entitlement to the request', async () => {
         process.env.BILLING_ENFORCED = 'true';
-        const ent = { active: true, tier: 'standard', reason: 'covered_seat' };
+        const ent = { active: true, tier: 'standard', reason: 'subscribed' };
         sinon.stub(entitlements, 'getEffectiveSubscription').resolves(ent);
         const req = reqFor('DELETE');
         const next = sinon.stub();

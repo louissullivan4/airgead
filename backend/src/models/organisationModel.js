@@ -27,7 +27,7 @@ const ORG_UPDATABLE_FIELDS = ['name', 'description', 'country', 'vat_number', 't
 // `emailVerified` (Phase 6): invite-token signups arrive BY email, so the
 // address is proven and stamped at creation; self-serve signups start null and
 // verify via the emailed link (userController).
-const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId, createdBy, emailVerified }) => {
+const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId, createdBy, emailVerified, practicePreApproved }) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -58,11 +58,17 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
             if (!ORG_CATEGORY_SLUGS.includes(orgCategory)) {
                 orgCategory = 'personal';
             }
-            // Self-serve accountancy firm signup: flags the org so it unlocks the
-            // Clients workspace and may invite clients. A firm is always a
-            // business. (Phase 3 kept this flag DB-only; Phase 3.1 lets a firm
-            // self-provision at signup - the signer becomes the admin/owner.)
+            // Accountancy firm signup. A practice is FREE but must be APPROVED
+            // before it gains practice powers, so a self-serve application is
+            // created PENDING (is_accountant_practice stays false until a
+            // super_admin approves). A super_admin platform invite arrives
+            // pre-approved (the admin already vetted them). Either way a firm is
+            // always a business.
             const isPractice = Boolean(provided && provided.is_accountant_practice === true);
+            const practiceApproved = isPractice && practicePreApproved === true;
+            // The EFFECTIVE capability flag: only true once approved.
+            const practiceFlag = practiceApproved;
+            const practiceStatus = isPractice ? (practiceApproved ? 'approved' : 'pending') : 'none';
 
             // A non-personal category (or a firm) implies a business; else
             // honour an explicit business type, else personal.
@@ -76,8 +82,8 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
 
             const org = await client.query(
                 `INSERT INTO organisations
-                    (name, type, description, country, vat_number, org_category, categories, is_accountant_practice)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+                    (name, type, description, country, vat_number, org_category, categories, is_accountant_practice, practice_status, practice_approved_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)
                  RETURNING id`,
                 [
                     orgName,
@@ -87,7 +93,9 @@ const createUserWithOrg = async (pool, { user, mode, inviterId, accountantOrgId,
                     (provided && provided.vat_number) || null,
                     orgCategory,
                     JSON.stringify(categories),
-                    isPractice,
+                    practiceFlag,
+                    practiceStatus,
+                    practiceApproved ? new Date() : null,
                 ]
             );
             orgId = org.rows[0].id;
@@ -212,4 +220,35 @@ const updateOrg = async (pool, orgId, fields) => {
     }
 };
 
-module.exports = { createUserWithOrg, getOrgById, updateOrg };
+// Approve or reject an accountancy practice APPLICATION (super_admin only -
+// enforced in the controller). Approval flips the effective capability flag
+// (is_accountant_practice) and stamps the approver; rejection records the
+// decision and leaves the flag false. Returns the updated row, or null when the
+// org does not exist.
+const setPracticeApproval = async (pool, orgId, { approved, approverId }) => {
+    const status = approved ? 'approved' : 'rejected';
+    try {
+        const result = await pool.query(
+            `UPDATE organisations
+                SET is_accountant_practice = $2,
+                    practice_status = $3,
+                    practice_approved_at = $4,
+                    practice_approved_by = $5,
+                    updated_at = now()
+              WHERE id = $1
+              RETURNING *`,
+            [orgId, Boolean(approved), status, approved ? new Date() : null, approved ? (approverId || null) : null]
+        );
+        if (result.rows.length > 0) {
+            logger.info('Practice approval set', { orgId, status });
+            return result.rows[0];
+        }
+        logger.warn('Organisation not found for practice approval', { orgId });
+        return null;
+    } catch (error) {
+        logger.error('Error setting practice approval', { orgId, error: error.message });
+        throw error;
+    }
+};
+
+module.exports = { createUserWithOrg, getOrgById, updateOrg, setPracticeApproval };

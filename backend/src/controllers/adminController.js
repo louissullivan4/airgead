@@ -5,6 +5,8 @@ const userModel = require('../models/userModel');
 const organisationModel = require('../models/organisationModel');
 const storage = require('../utils/storage');
 const userController = require('./userController');
+const { sendEmail } = require('../utils/email');
+const { BRAND } = require('../config/brand');
 const logger = require('../utils/logger');
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -53,6 +55,89 @@ const listOrgs = async (req, res) => {
         res.status(200).json(await adminModel.getAllOrgsWithStats(req.pool, TAX_YEAR()));
     } catch (error) {
         logger.error('Error listing orgs: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+// GET /admin/practice-applications - accountancy practices awaiting review.
+const listPracticeApplications = async (req, res) => {
+    try {
+        res.status(200).json(await adminModel.getPracticeApplications(req.pool));
+    } catch (error) {
+        logger.error('Error listing practice applications: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+// Tell a practice owner the outcome of their application (best-effort).
+const sendPracticeDecisionEmail = async (email, practiceName, approved) => {
+    const name = (practiceName && String(practiceName).trim()) || 'your practice';
+    if (approved) {
+        await sendEmail({
+            to: email,
+            subject: `${name} is approved on ${BRAND}`,
+            heading: "You're approved",
+            paragraphs: [
+                `Good news - ${name} has been approved on ${BRAND}.`,
+                'Your practice account is free. You can now invite clients from the Clients workspace and manage their books. Each client gets a 14-day free trial and then subscribes directly.',
+            ],
+            cta: { label: 'Go to your practice', url: `${frontendURL}/clients` },
+            footerNote: `You received this because you applied for a ${BRAND} practice account.`,
+            text: `${name} has been approved on ${BRAND}. Your practice account is free - invite clients from the Clients workspace: ${frontendURL}/clients`,
+        });
+    } else {
+        await sendEmail({
+            to: email,
+            subject: `Update on your ${BRAND} practice application`,
+            heading: 'Practice application update',
+            paragraphs: [
+                `Thanks for your interest in ${BRAND}.`,
+                `We're not able to approve ${name} as a practice account at this time. If you think this is a mistake, reply to this email and we'll take another look.`,
+            ],
+            footerNote: `You received this because you applied for a ${BRAND} practice account.`,
+            text: `We're not able to approve ${name} as a ${BRAND} practice account at this time. Reply to this email if you think this is a mistake.`,
+        });
+    }
+};
+
+// PATCH /admin/orgs/:id/practice-approval { decision: 'approved' | 'rejected' }
+// Approve unlocks free practice powers (invites + always-active entitlement);
+// reject records the decision. Either way the applicant is emailed the outcome.
+const setPracticeApproval = async (req, res) => {
+    const { id } = req.params;
+    const { decision } = req.body;
+    if (!['approved', 'rejected'].includes(decision)) {
+        return res.status(400).json({ error: "decision must be 'approved' or 'rejected'." });
+    }
+    try {
+        const org = await organisationModel.getOrgById(req.pool, id);
+        if (!org) return res.status(404).json({ error: 'Organisation not found.' });
+
+        const updated = await organisationModel.setPracticeApproval(req.pool, id, {
+            approved: decision === 'approved',
+            approverId: req.user.userId,
+        });
+
+        try {
+            const owner = org.owner_account_id ? await userModel.getUserById(req.pool, org.owner_account_id) : null;
+            if (owner && owner.email) {
+                await sendPracticeDecisionEmail(owner.email, org.name, decision === 'approved');
+            }
+        } catch (mailError) {
+            logger.warn('Practice decision email failed for org %s: %s', id, mailError.message);
+        }
+
+        logger.info('Practice %s %s by %s', id, decision, req.user.userId);
+        res.status(200).json({
+            message: `Practice ${decision}.`,
+            org: {
+                id: updated.id,
+                practice_status: updated.practice_status,
+                is_accountant_practice: updated.is_accountant_practice,
+            },
+        });
+    } catch (error) {
+        logger.error('Error setting practice approval: %s', error.message);
         res.status(500).json({ error: 'Internal server error.' });
     }
 };
@@ -209,11 +294,13 @@ const deleteOrg = async (req, res) => {
 module.exports = {
     getOverview,
     listOrgs,
+    listPracticeApplications,
     listUsers,
     invite,
     setUserPlatformRole,
     setUserStatus,
     setOrgStatus,
+    setPracticeApproval,
     deleteUser,
     deleteOrg,
 };

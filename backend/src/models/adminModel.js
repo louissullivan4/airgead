@@ -36,7 +36,7 @@ const getAllOrgsWithStats = async (pool, year) => {
     try {
         const result = await pool.query(
             `SELECT
-                o.id, o.name, o.type, o.org_category, o.is_accountant_practice, o.status, o.created_at,
+                o.id, o.name, o.type, o.org_category, o.is_accountant_practice, o.practice_status, o.status, o.created_at,
                 (SELECT count(*) FROM users u WHERE u.org_id = o.id) AS member_count,
                 COALESCE(s.txn_count, 0)     AS txn_count,
                 COALESCE(s.expense_total, 0) AS expense_total,
@@ -59,6 +59,26 @@ const getAllOrgsWithStats = async (pool, year) => {
         return result.rows;
     } catch (error) {
         logger.error('Error fetching all orgs', { error: error.message });
+        throw error;
+    }
+};
+
+// Accountancy practices awaiting review (self-serve applications), oldest
+// first, with the applying owner's contact so a super_admin can vet them.
+const getPracticeApplications = async (pool) => {
+    try {
+        const result = await pool.query(
+            `SELECT
+                o.id, o.name, o.description, o.country, o.vat_number, o.created_at,
+                u.fname, u.sname, u.email AS owner_email
+             FROM organisations o
+             LEFT JOIN users u ON u.id = o.owner_account_id
+             WHERE o.practice_status = 'pending'
+             ORDER BY o.created_at ASC`
+        );
+        return result.rows;
+    } catch (error) {
+        logger.error('Error fetching practice applications', { error: error.message });
         throw error;
     }
 };
@@ -165,6 +185,7 @@ const deleteUserCascade = async (pool, userId) => {
 module.exports = {
     getPlatformStats,
     getAllOrgsWithStats,
+    getPracticeApplications,
     getAllUsersWithOrg,
     deleteOrgCascade,
     deleteUserCascade,

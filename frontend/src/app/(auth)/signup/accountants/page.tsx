@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
@@ -25,8 +24,6 @@ import { Textarea } from "@/components/ui/textarea";
 // (is_accountant_practice), so there is no business-type picker here and the
 // practice name is mandatory - unlike the optional org section on /signup.
 export default function AccountantSignupPage() {
-  const router = useRouter();
-
   const [fname, setFname] = useState("");
   const [sname, setSname] = useState("");
   const [email, setEmail] = useState("");
@@ -35,6 +32,7 @@ export default function AccountantSignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const [practiceName, setPracticeName] = useState("");
   const [practiceNameError, setPracticeNameError] = useState<string | null>(null);
@@ -78,12 +76,33 @@ export default function AccountantSignupPage() {
           is_accountant_practice: true,
         },
       });
-      router.push("/home");
-      router.refresh();
+      // The practice account is created PENDING review - show the confirmation
+      // rather than dropping them straight into the (still-locked) workspace.
+      setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
       setLoading(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Application received</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          Thanks for applying. We review every practice before activating it - we&apos;ll email{" "}
+          <span className="font-medium text-foreground">{email}</span> as soon as{" "}
+          {practiceName.trim() || "your practice"} is approved.
+        </p>
+        <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          Once approved, your practice account is free and you can invite clients from the Clients
+          workspace. Each client gets a 14-day free trial and then subscribes directly.
+        </div>
+        <Button asChild className="mt-8 w-full">
+          <Link href="/home">Go to your dashboard</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -91,6 +110,10 @@ export default function AccountantSignupPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Create your practice</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {`For accountancy practices: manage your clients' books with ${BRAND} - invite clients, review their records, and export tax-ready packs.`}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        New practices are reviewed before activation. It&apos;s free for your practice - your clients
+        subscribe directly.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">

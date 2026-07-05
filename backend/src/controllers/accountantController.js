@@ -4,14 +4,27 @@ const path = require('path');
 const fs = require('fs-extra');
 const expenseModel = require('../models/expenseModel');
 const userModel = require('../models/userModel');
+const organisationModel = require('../models/organisationModel');
 const accountantLinkModel = require('../models/accountantLinkModel');
+const billingReminderModel = require('../models/billingReminderModel');
 const { isSuperAdmin } = require('../middlewares/tenantScope');
 const { sendInviteEmail } = require('./userController');
 const { downloadImages, createZipArchive } = require('../middlewares/imageDownload');
 const { buildTaxSummary } = require('../services/tax/taxSummaryService');
-const seatSync = require('../services/billing/seatSync');
+const reminderJob = require('../services/billing/reminderJob');
 const gf = require('../utils/gf');
 const logger = require('../utils/logger');
+
+// A client org's billing state, as the accountant's Clients list shows it:
+//   'active'  - paying (or in Stripe's own trial/dunning window)
+//   'trial'   - inside the free trial
+//   'expired' - trial lapsed, not subscribed (a candidate to nudge)
+const PAYING_STATUSES = ['active', 'trialing', 'past_due'];
+const clientBillingLabel = (org) => {
+    if (PAYING_STATUSES.includes(org.billing_status)) return 'active';
+    if (org.trial_ends_at && new Date(org.trial_ends_at) > new Date()) return 'trial';
+    return 'expired';
+};
 
 const jwtSecret = process.env.JWT_SECRET;
 const frontendURL = process.env.FRONTEND_URL;
@@ -83,7 +96,14 @@ const listClients = async (req, res) => {
         const accountantOrgId = isSuperAdmin(req) ? null : req.user.orgId;
         const ownerUserId = isFirmAdmin(req) ? null : req.user.userId;
         const clients = await accountantLinkModel.getClientsWithStats(req.pool, accountantOrgId, TAX_YEAR(), ownerUserId);
-        res.status(200).json(clients);
+        // Surface each client's billing state so the practice can see who is
+        // trialing/expired and nudge them (the client pays for themselves now).
+        const withBilling = clients.map((c) => ({
+            ...c,
+            billing: clientBillingLabel(c),
+            trialEndsAt: c.trial_ends_at || null,
+        }));
+        res.status(200).json(withBilling);
     } catch (error) {
         logger.error('Error listing accountant clients: %s', error.message);
         res.status(500).json({ error: 'Internal server error.' });
@@ -220,12 +240,55 @@ const revokeClient = async (req, res) => {
             ? (req.body && req.body.accountantOrgId) || req.user.orgId
             : req.user.orgId;
         await accountantLinkModel.revokeLink(req.pool, accountantOrgId, clientOrgId);
-        // One fewer active seat - sync the practice's Stripe quantity.
-        // Best-effort: never throws, no-ops when Stripe is unconfigured.
-        await seatSync.syncPracticeSeats(req.pool, accountantOrgId);
+        // Revoking only removes the accountant's read access; the client keeps
+        // its own subscription/trial (billing is decoupled from the link).
         res.status(200).json({ message: 'Client access revoked.' });
     } catch (error) {
         logger.error('Error revoking client access: %s', error.message);
+        res.status(500).json({ error: 'Internal server error.' });
+    }
+};
+
+// POST /accountant/clients/:clientOrgId/remind - nudge a client to subscribe.
+// Same link gate as every other client action. No-ops (with a friendly message)
+// when the client is already paying or was already reminded today; otherwise
+// sends the standard trial/pay email to the client's owner and logs it so a
+// second click the same day doesn't double-send.
+const remindClient = async (req, res) => {
+    try {
+        const { clientOrgId } = req.params;
+        if (!(await assertClientAccess(req, res, clientOrgId))) return;
+
+        const org = await organisationModel.getOrgById(req.pool, clientOrgId);
+        if (!org) return res.status(404).json({ error: 'Client organisation not found.' });
+
+        if (PAYING_STATUSES.includes(org.billing_status)) {
+            return res.status(400).json({ error: 'This client already has an active subscription.' });
+        }
+
+        const owner = org.owner_account_id ? await userModel.getUserById(req.pool, org.owner_account_id) : null;
+        if (!owner || !owner.email) {
+            return res.status(400).json({ error: 'This client has no contactable owner email.' });
+        }
+
+        // One nudge per client per day (idempotent via the reminder log).
+        const today = new Date().toISOString().slice(0, 10);
+        const kind = `manual_${today}`;
+        if (await billingReminderModel.wasSent(req.pool, clientOrgId, kind)) {
+            return res.status(200).json({ message: 'This client was already reminded today.', alreadySent: true });
+        }
+
+        const expired = !org.trial_ends_at || new Date(org.trial_ends_at) <= new Date();
+        await reminderJob.sendReminderEmail(
+            { id: org.id, name: org.name, trial_ends_at: org.trial_ends_at, owner_email: owner.email },
+            expired ? 'trial_expired' : 'trial_t1'
+        );
+        await billingReminderModel.recordSent(req.pool, clientOrgId, kind);
+
+        logger.info('Manual client reminder sent by %s to client %s', req.user.userId, clientOrgId);
+        res.status(200).json({ message: 'Reminder sent.' });
+    } catch (error) {
+        logger.error('Error sending client reminder: %s', error.message);
         res.status(500).json({ error: 'Internal server error.' });
     }
 };
@@ -272,4 +335,5 @@ module.exports = {
     exportClient,
     revokeClient,
     reassignClient,
+    remindClient,
 };

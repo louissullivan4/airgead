@@ -165,7 +165,7 @@ describe('Phase 3.1 - firm signup flag', () => {
     const orgInsertParams = (client) =>
         client.query.getCalls().find((c) => /INSERT INTO organisations/i.test(c.args[0])).args[1];
 
-    it('flags is_accountant_practice=true and forces business type on firm signup', async () => {
+    it('a self-serve firm signup starts PENDING review (business type, not yet a practice)', async () => {
         const client = makeClient();
         const pool = { connect: sinon.stub().resolves(client) };
 
@@ -180,10 +180,32 @@ describe('Phase 3.1 - firm signup flag', () => {
 
         const params = orgInsertParams(client);
         expect(params[1]).toBe('business');   // type forced to business
-        expect(params[7]).toBe(true);         // is_accountant_practice
+        expect(params[7]).toBe(false);        // NOT yet a practice - awaiting approval
+        expect(params[8]).toBe('pending');    // practice_status
+        expect(params[9]).toBeNull();         // practice_approved_at
     });
 
-    it('leaves is_accountant_practice=false for an ordinary personal signup', async () => {
+    it('a pre-approved (platform-invited) firm is a practice immediately', async () => {
+        const client = makeClient();
+        const pool = { connect: sinon.stub().resolves(client) };
+
+        await organisationModel.createUserWithOrg(pool, {
+            mode: 'self',
+            inviterId: null,
+            practicePreApproved: true,
+            user: {
+                fname: 'Áine', sname: 'Kelly', email: 'firm@x.ie', currency: 'EUR', password: 'hash',
+                organisation: { name: 'Kelly & Co', is_accountant_practice: true },
+            },
+        });
+
+        const params = orgInsertParams(client);
+        expect(params[7]).toBe(true);         // is_accountant_practice
+        expect(params[8]).toBe('approved');   // practice_status
+        expect(params[9]).toBeInstanceOf(Date); // practice_approved_at stamped
+    });
+
+    it('leaves a personal signup a non-practice (practice_status none)', async () => {
         const client = makeClient();
         const pool = { connect: sinon.stub().resolves(client) };
 
@@ -193,7 +215,9 @@ describe('Phase 3.1 - firm signup flag', () => {
             user: { fname: 'Sam', sname: 'Quinn', email: 'p@x.ie', currency: 'EUR', password: 'hash' },
         });
 
-        expect(orgInsertParams(client)[7]).toBe(false);
+        const params = orgInsertParams(client);
+        expect(params[7]).toBe(false);
+        expect(params[8]).toBe('none');
     });
 });
 

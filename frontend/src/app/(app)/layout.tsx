@@ -40,7 +40,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   //  - Team: owners of a business org (members roll up to it).
   //  - Tax summary: business orgs (Form 11 / capital allowances / VAT).
   const isSuperAdmin = session?.platformRole === "super_admin";
-  const showClients = Boolean(org?.is_accountant_practice) || isSuperAdmin;
+  // Approved practices and pending applicants both get the Clients workspace -
+  // a pending practice sees the "under review" state there.
+  const showClients =
+    Boolean(org?.is_accountant_practice) || org?.practice_status === "pending" || isSuperAdmin;
   const showTeam = org?.type === "business" && session?.orgRole === "owner";
   const showReports = org?.type === "business";
 

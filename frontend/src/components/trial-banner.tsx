@@ -10,7 +10,7 @@ const WARN_DAYS = 7;
 /**
  * Trial/expiry banner shown across the app (mounted in the app layout).
  * Renders nothing while billing isn't enforced (the backend says so), for
- * paid/covered/practice orgs, and for trials with plenty of runway - it only
+ * paid or practice orgs, and for trials with plenty of runway - it only
  * speaks up in the last week and after expiry.
  */
 function TrialBanner() {
@@ -28,7 +28,7 @@ function TrialBanner() {
   }, []);
 
   if (!status || !status.enforced) return null;
-  // Paid, covered by a practice, or a practice itself - nothing to nag about.
+  // Paid or a practice itself (always free) - nothing to nag about.
   if (status.active && status.reason !== "trial") return null;
 
   const daysLeft = status.trialEndsAt

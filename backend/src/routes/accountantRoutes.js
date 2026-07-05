@@ -21,6 +21,8 @@ router.get('/clients/:clientOrgId/export', accountantController.exportClient);
 router.get('/clients/:clientOrgId/sage-settings', requireSageEnabled, sageController.getClientSageSettings);
 router.post('/clients/:clientOrgId/sage-export', requireSageEnabled, sageController.exportClientToSage);
 router.delete('/clients/:clientOrgId/link', accountantController.revokeClient);
+// Nudge a client to subscribe (email their owner). Same in-handler link gate.
+router.post('/clients/:clientOrgId/remind', accountantController.remindClient);
 // Reassign a client to another accountant - firm admin (owner) only.
 router.patch('/clients/:clientOrgId/assign', requireOrgRole('owner'), accountantController.reassignClient);
 

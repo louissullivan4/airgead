@@ -4,7 +4,6 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 const userModel = require('../models/userModel');
 const organisationModel = require('../models/organisationModel');
-const seatSync = require('../services/billing/seatSync');
 const logger = require('../utils/logger');
 const { uploadBase64Image } = require('../middlewares/imageUpload');
 const moment = require('moment');
@@ -77,6 +76,42 @@ const sendVerificationEmail = async (email) => {
         footerNote: `You received this because this address was used to sign up to ${BRAND}.`,
         text: `Welcome to ${BRAND}! Please confirm your email address by clicking this link (valid for 24 hours): ${verifyLink}\n\nIf the link expires, you can request a new one from the app.`,
     });
+};
+
+// A self-serve accountancy practice signup is an APPLICATION: confirm receipt to
+// the applicant and ping the platform inbox so a super_admin can review it in
+// the admin panel. The notification target is PRACTICE_APPLICATIONS_EMAIL, or
+// the support inbox (EMAIL_USERNAME) as a fallback. Throws on send failure so
+// the caller decides how to respond (register treats it as best-effort).
+const notifyPracticeApplication = async (email, practiceName) => {
+    const name = (practiceName && String(practiceName).trim()) || 'your practice';
+    await sendEmail({
+        to: email,
+        subject: `We've received your ${BRAND} practice application`,
+        heading: 'Application received',
+        paragraphs: [
+            `Thanks for applying to use ${BRAND} as an accountancy practice.`,
+            `We review every practice before activating it. Once ${name} is approved you'll be able to invite clients and manage their books - free for your practice. We'll email you the moment it's live.`,
+        ],
+        footerNote: `You received this because this address applied for a ${BRAND} practice account.`,
+        text: `Thanks for applying to use ${BRAND} as an accountancy practice. We review every practice before activating it; we'll email you once ${name} is approved.`,
+    });
+
+    const adminInbox = process.env.PRACTICE_APPLICATIONS_EMAIL || process.env.EMAIL_USERNAME;
+    if (adminInbox) {
+        await sendEmail({
+            to: adminInbox,
+            subject: `New practice application: ${name}`,
+            heading: 'New practice application',
+            paragraphs: [
+                `A new accountancy practice has applied for a ${BRAND} account.`,
+                `Practice: ${name}`,
+                `Contact: ${email}`,
+                'Review and approve it from the admin panel (Practice applications).',
+            ],
+            text: `New practice application.\nPractice: ${name}\nContact: ${email}\nApprove it from the admin panel.`,
+        });
+    }
 };
 
 const createUser = async (req, res) => {
@@ -408,6 +443,10 @@ const register = async (req, res) => {
     let inviterId = null;
     let accountantOrgId = null;
     let createdBy = null;
+    // A practice created via a super_admin platform invite arrives PRE-APPROVED
+    // (the admin vetted them by inviting); a self-serve practice signup is only
+    // an application and starts pending review.
+    let practicePreApproved = false;
     if (token) {
         try {
             const decoded = jwt.verify(token, jwtSecret);
@@ -422,9 +461,11 @@ const register = async (req, res) => {
                 createdBy = decoded.created_by || null;
             } else if (decoded.kind === 'platform') {
                 // Super-admin platform invite: the invitee creates their OWN org
-                // (mode stays 'self'). 'accountant' invites flag it as a firm.
+                // (mode stays 'self'). 'accountant' invites flag it as a firm,
+                // pre-approved since a super_admin issued the invite.
                 if (decoded.is_accountant_practice) {
                     req.body.organisation = { ...(req.body.organisation || {}), is_accountant_practice: true };
+                    practicePreApproved = true;
                 }
             } else {
                 // Member invite: join the inviter's existing org.
@@ -455,7 +496,23 @@ const register = async (req, res) => {
             accountantOrgId,
             createdBy,
             emailVerified,
+            practicePreApproved,
         });
+
+        // A self-serve practice signup is an APPLICATION awaiting review:
+        // confirm receipt to the applicant and notify the platform so a
+        // super_admin can approve it. Best-effort - a mail hiccup must not fail
+        // the signup (the application row is already committed).
+        const isPracticeApplication = Boolean(
+            req.body.organisation && req.body.organisation.is_accountant_practice === true && !practicePreApproved
+        );
+        if (isPracticeApplication) {
+            try {
+                await notifyPracticeApplication(email, req.body.organisation.name);
+            } catch (mailError) {
+                logger.warn('Practice application email failed for %s: %s', email, mailError.message);
+            }
+        }
 
         if (!emailVerified && requireEmailVerification()) {
             // Best-effort: a mail hiccup must not fail the signup - the user
@@ -465,13 +522,6 @@ const register = async (req, res) => {
             } catch (mailError) {
                 logger.warn('Verification email failed for %s: %s', email, mailError.message);
             }
-        }
-
-        // A new client seat changes what the inviting practice pays: sync its
-        // Stripe quantity AFTER the signup transaction committed. Best-effort -
-        // syncPracticeSeats never throws and no-ops when Stripe is unconfigured.
-        if (accountantOrgId) {
-            await seatSync.syncPracticeSeats(req.pool, accountantOrgId);
         }
 
         const newToken = gf.generateJwtToken(newUser);

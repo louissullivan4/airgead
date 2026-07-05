@@ -9,7 +9,6 @@ const billingModel = require('../src/models/billingModel');
 const organisationModel = require('../src/models/organisationModel');
 const userModel = require('../src/models/userModel');
 const billingController = require('../src/controllers/billingController');
-const { syncPracticeSeats } = require('../src/services/billing/seatSync');
 
 const makeRes = () => ({ status: sinon.stub().returnsThis(), json: sinon.stub() });
 
@@ -22,7 +21,6 @@ const authedReq = (extra = {}) => ({
 afterEach(() => {
     sinon.restore();
     delete process.env.STRIPE_PRICE_SOLO;
-    delete process.env.STRIPE_PRICE_SEAT;
 });
 
 describe('POST /billing/checkout-session', () => {
@@ -60,38 +58,36 @@ describe('POST /billing/checkout-session', () => {
         expect(res.json.firstCall.args[0]).toEqual({ url: 'https://stripe.test/checkout' });
     });
 
-    it('a practice checks out the SEAT price at its active-link count', async () => {
-        process.env.STRIPE_PRICE_SEAT = 'price_seat';
-        const sessions = sinon.stub().resolves({ url: 'https://stripe.test/checkout' });
-        sinon.stub(stripeClient, 'getStripeClient').returns({
-            checkout: { sessions: { create: sessions } },
-        });
+    it('a practice is free and is refused checkout (nothing to buy)', async () => {
+        process.env.STRIPE_PRICE_SOLO = 'price_solo';
+        const sessions = sinon.stub().resolves({ url: 'x' });
+        sinon.stub(stripeClient, 'getStripeClient').returns({ checkout: { sessions: { create: sessions } } });
         sinon.stub(organisationModel, 'getOrgById').resolves({
             id: 'org-1', name: 'Airgead Accountancy', is_accountant_practice: true, stripe_customer_id: 'cus_existing',
         });
-        sinon.stub(billingModel, 'countActiveSeats').resolves(7);
 
         const res = makeRes();
         await billingController.createCheckoutSession(authedReq(), res);
 
-        expect(sessions.firstCall.args[0].line_items).toEqual([{ price: 'price_seat', quantity: 7 }]);
-        expect(sessions.firstCall.args[0].customer).toBe('cus_existing');
+        expect(res.status.calledWith(400)).toBe(true);
+        expect(sessions.notCalled).toBe(true);
     });
 
-    it('a practice with zero clients still checks out one seat (never an empty cart)', async () => {
-        process.env.STRIPE_PRICE_SEAT = 'price_seat';
+    it('a pending practice applicant is also refused checkout (free during review)', async () => {
+        process.env.STRIPE_PRICE_SOLO = 'price_solo';
         const sessions = sinon.stub().resolves({ url: 'x' });
         sinon.stub(stripeClient, 'getStripeClient').returns({ checkout: { sessions: { create: sessions } } });
         sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', is_accountant_practice: true, stripe_customer_id: 'cus_1',
+            id: 'org-1', is_accountant_practice: false, practice_status: 'pending', stripe_customer_id: 'cus_1',
         });
-        sinon.stub(billingModel, 'countActiveSeats').resolves(0);
 
-        await billingController.createCheckoutSession(authedReq(), makeRes());
-        expect(sessions.firstCall.args[0].line_items[0].quantity).toBe(1);
+        const res = makeRes();
+        await billingController.createCheckoutSession(authedReq(), res);
+        expect(res.status.calledWith(400)).toBe(true);
+        expect(sessions.notCalled).toBe(true);
     });
 
-    it('502s when the price id for the org kind is missing', async () => {
+    it('502s when the solo price id is missing', async () => {
         sinon.stub(stripeClient, 'getStripeClient').returns({});
         sinon.stub(organisationModel, 'getOrgById').resolves({ id: 'org-1', is_accountant_practice: false });
         const res = makeRes();
@@ -211,66 +207,5 @@ describe('POST /billing/webhook', () => {
         await billingController.handleWebhook(webhookReq(), res);
         expect(res.status.calledWith(200)).toBe(true);
         expect(apply.notCalled).toBe(true);
-    });
-});
-
-describe('syncPracticeSeats', () => {
-    it('no-ops without Stripe configured', async () => {
-        sinon.stub(stripeClient, 'getStripeClient').returns(null);
-        expect(await syncPracticeSeats({}, 'org-1')).toEqual({ synced: false, reason: 'unconfigured' });
-    });
-
-    it('no-ops for a practice that has not subscribed yet', async () => {
-        sinon.stub(stripeClient, 'getStripeClient').returns({});
-        sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', is_accountant_practice: true, stripe_subscription_id: null,
-        });
-        expect(await syncPracticeSeats({}, 'org-1')).toEqual({ synced: false, reason: 'no_subscription' });
-    });
-
-    it('updates the subscription item quantity to the active-link count', async () => {
-        const update = sinon.stub().resolves({});
-        sinon.stub(stripeClient, 'getStripeClient').returns({
-            subscriptions: {
-                retrieve: sinon.stub().resolves({ id: 'sub_1', items: { data: [{ id: 'si_1', quantity: 2 }] } }),
-                update,
-            },
-        });
-        sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', is_accountant_practice: true, stripe_subscription_id: 'sub_1',
-        });
-        sinon.stub(billingModel, 'countActiveSeats').resolves(5);
-
-        expect(await syncPracticeSeats({}, 'org-1')).toEqual({ synced: true, seats: 5, changed: true });
-        expect(update.calledWith('sub_1', sinon.match({ items: [{ id: 'si_1', quantity: 5 }] }))).toBe(true);
-    });
-
-    it('skips the Stripe call when the quantity already matches', async () => {
-        const update = sinon.stub();
-        sinon.stub(stripeClient, 'getStripeClient').returns({
-            subscriptions: {
-                retrieve: sinon.stub().resolves({ id: 'sub_1', items: { data: [{ id: 'si_1', quantity: 3 }] } }),
-                update,
-            },
-        });
-        sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', is_accountant_practice: true, stripe_subscription_id: 'sub_1',
-        });
-        sinon.stub(billingModel, 'countActiveSeats').resolves(3);
-
-        expect(await syncPracticeSeats({}, 'org-1')).toEqual({ synced: true, seats: 3, changed: false });
-        expect(update.notCalled).toBe(true);
-    });
-
-    it('swallows Stripe failures - a sync must never fail the signup/revoke that triggered it', async () => {
-        sinon.stub(stripeClient, 'getStripeClient').returns({
-            subscriptions: { retrieve: sinon.stub().rejects(new Error('stripe 500')) },
-        });
-        sinon.stub(organisationModel, 'getOrgById').resolves({
-            id: 'org-1', is_accountant_practice: true, stripe_subscription_id: 'sub_1',
-        });
-        sinon.stub(billingModel, 'countActiveSeats').resolves(2);
-
-        expect(await syncPracticeSeats({}, 'org-1')).toEqual({ synced: false, reason: 'error' });
     });
 });

@@ -90,6 +90,8 @@ const getClientsWithStats = async (pool, accountantOrgId, year, ownerUserId) => 
                 o.name,
                 o.type,
                 o.org_category,
+                o.trial_ends_at,
+                o.billing_status,
                 l.created_by,
                 NULLIF(TRIM(CONCAT(u.fname, ' ', u.sname)), '') AS owner_name,
                 COALESCE(stats.txn_count, 0)      AS txn_count,

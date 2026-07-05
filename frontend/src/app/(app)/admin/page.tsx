@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, MoreHorizontal, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Building2, Check, Clock, MoreHorizontal, Search, ShieldCheck, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -10,6 +10,7 @@ import {
   type AdminOrg,
   type AdminUser,
   type PlatformStats,
+  type PracticeApplication,
 } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
@@ -39,13 +40,21 @@ import {
 
 const num = (v: string | number) => Number(v) || 0;
 
-type Confirm = { title: string; body: string; action: () => Promise<void> };
+type Confirm = {
+  title: string;
+  body: string;
+  action: () => Promise<void>;
+  /** Confirm-button label; defaults to a destructive "Delete permanently". */
+  confirmLabel?: string;
+  destructive?: boolean;
+};
 
 export default function AdminPage() {
   const { session } = useSession();
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [orgs, setOrgs] = useState<AdminOrg[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [applications, setApplications] = useState<PracticeApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -56,10 +65,16 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, o, u] = await Promise.all([api.admin.overview(), api.admin.orgs(), api.admin.users()]);
+      const [s, o, u, a] = await Promise.all([
+        api.admin.overview(),
+        api.admin.orgs(),
+        api.admin.users(),
+        api.admin.practiceApplications(),
+      ]);
       setStats(s);
       setOrgs(o);
       setUsers(u);
+      setApplications(a);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load platform data");
@@ -166,6 +181,65 @@ export default function AdminPage() {
         />
       </div>
 
+      {/* Practice applications - accountancy firms awaiting approval. */}
+      {applications.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+            <Clock className="size-4" />
+            Practice applications
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-500">
+              {applications.length} pending
+            </span>
+          </h2>
+          <Card className="divide-y divide-border/60">
+            {applications.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="font-medium">{a.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[`${a.fname ?? ""} ${a.sname ?? ""}`.trim(), a.owner_email, a.country]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    {a.vat_number ? ` · VAT ${a.vat_number}` : ""}
+                  </p>
+                  {a.description && (
+                    <p className="mt-1 text-xs text-muted-foreground">{a.description}</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      run(() => api.admin.setPracticeApproval(a.id, "approved"), `${a.name} approved`)
+                    }
+                  >
+                    <Check />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setConfirm({
+                        title: `Reject ${a.name}?`,
+                        body: "The applicant is emailed that their practice wasn't approved. They keep a normal account and can be approved later.",
+                        confirmLabel: "Reject practice",
+                        destructive: false,
+                        action: () =>
+                          run(() => api.admin.setPracticeApproval(a.id, "rejected"), `${a.name} rejected`),
+                      })
+                    }
+                  >
+                    <X />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </Card>
+        </section>
+      )}
+
       {/* Organisations */}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">Organisations</h2>
@@ -194,7 +268,11 @@ export default function AdminPage() {
                       </Link>
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">
-                      {o.is_accountant_practice ? "Firm" : o.type}
+                      {o.is_accountant_practice
+                        ? "Firm"
+                        : o.practice_status === "pending"
+                          ? "Firm (pending)"
+                          : o.type}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">
                       {num(o.member_count)}
@@ -368,8 +446,12 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={working} onClick={runConfirm}>
-              Delete permanently
+            <AlertDialogAction
+              variant={confirm?.destructive === false ? "primary" : "destructive"}
+              disabled={working}
+              onClick={runConfirm}
+            >
+              {confirm?.confirmLabel ?? "Delete permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

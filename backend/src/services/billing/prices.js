@@ -20,25 +20,21 @@ const shape = (price) => (price && typeof price.unit_amount === 'number'
     }
     : null);
 
-// Resolve { premium, seat }:
-//   premium = the self-serve price   (STRIPE_PRICE_SOLO)
-//   seat    = the per-client-seat price a practice pays (STRIPE_PRICE_SEAT)
-// Either may be null when Stripe is unconfigured or a lookup fails - callers
+// Resolve { premium }: the self-serve monthly price (STRIPE_PRICE_SOLO) that
+// every paying org - solo, business, or a practice's client - subscribes at.
+// (Practices are free and never charged; there is no per-seat price anymore.)
+// premium may be null when Stripe is unconfigured or a lookup fails - callers
 // fall back to their own static display defaults.
 const getLivePrices = async () => {
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
 
     const stripe = stripeClient.getStripeClient();
-    if (!stripe) return { premium: null, seat: null };
+    if (!stripe) return { premium: null };
 
     const soloId = process.env.STRIPE_PRICE_SOLO;
-    const seatId = process.env.STRIPE_PRICE_SEAT;
     try {
-        const [solo, seat] = await Promise.all([
-            soloId ? stripe.prices.retrieve(soloId) : Promise.resolve(null),
-            seatId ? stripe.prices.retrieve(seatId) : Promise.resolve(null),
-        ]);
-        const value = { premium: shape(solo), seat: shape(seat) };
+        const solo = soloId ? await stripe.prices.retrieve(soloId) : null;
+        const value = { premium: shape(solo) };
         cached = { at: Date.now(), value };
         return value;
     } catch (error) {
@@ -46,7 +42,7 @@ const getLivePrices = async () => {
         // let the caller show its static default. Deliberately not cached, so
         // the next request retries.
         logger.warn('Could not fetch live Stripe prices: %s', error.message);
-        return { premium: null, seat: null };
+        return { premium: null };
     }
 };
 

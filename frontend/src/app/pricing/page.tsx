@@ -80,7 +80,7 @@ export default async function PricingPage() {
         },
         {
           q: `My accountant uses ${BRAND} - do I pay?`,
-          a: "No. When your accountant's practice invited you, your seat is covered by the practice. You pay nothing.",
+          a: `Yes. You get your own account with a ${trialDays}-day free trial, then Premium (${premiumPrice}/month). Your accountant's practice is free - each client subscribes directly.`,
         },
         {
           q: "What happens if I stop paying?",
@@ -94,7 +94,7 @@ export default async function PricingPage() {
         },
         {
           q: `My accountant uses ${BRAND} - do I pay?`,
-          a: "No. When your accountant's practice invited you, your seat is covered by the practice. You pay nothing.",
+          a: `Each client has their own account. It's free during this demo; when billing is switched on you'll get a ${trialDays}-day trial, then Premium at ${premiumPrice}/month. The accountant's practice itself is always free.`,
         },
       ];
 
@@ -160,8 +160,11 @@ export default async function PricingPage() {
             )}
 
             <p className="mx-auto mt-8 max-w-xl text-center text-sm text-muted-foreground">
-              Invited by your accountant? Your seat is covered by their practice - the app is free
-              for you.
+              Are you an accountant? Your practice is <strong>free</strong> once approved - invite
+              clients and manage their books, and they subscribe directly.{" "}
+              <Link href="/signup/accountants" className="font-medium text-primary hover:underline">
+                For accountants →
+              </Link>
             </p>
           </div>
         </section>
