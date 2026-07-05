@@ -1,0 +1,28 @@
+name: Dependabot Auto-merge
+
+# Flips auto-merge on for Dependabot PRs; GitHub then merges only once all
+# required status checks on main pass. Majors are left for manual review.
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Enable auto-merge
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dependabot/fetch-metadata@v2
+        id: metadata
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          # Must be a PAT (Dependabot secret), not GITHUB_TOKEN: merges made
+          # with GITHUB_TOKEN don't trigger the push workflow, so the deploy
+          # pipeline would never run for auto-merged PRs.
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN }}
