@@ -21,7 +21,7 @@
   "dependencies": {
     "@google-cloud/storage": "^7.14.0",
     "@sentry/node": "^10.63.0",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "axios": "^1.7.9",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.4.0",
