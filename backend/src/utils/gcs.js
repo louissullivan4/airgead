@@ -10,11 +10,9 @@ let bucket;
 const getStorage = () => {
     if (!storage) {
         const opts = { projectId: process.env.GOOGLE_CLOUD_PROJECT_ID };
-        // Filesystem-less hosts (Railway, etc.) can't drop a key file on disk, so
-        // accept the service-account JSON inline via GOOGLE_CREDENTIALS_JSON. Fall
-        // back to GOOGLE_APPLICATION_CREDENTIALS (a key file path) for local dev.
         if (process.env.GOOGLE_CREDENTIALS_JSON) {
-            opts.credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+            const raw = process.env.GOOGLE_CREDENTIALS_JSON.replace(/\r?\n/g, "\\n");
+            opts.credentials = JSON.parse(raw);
         } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
             opts.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
         }
