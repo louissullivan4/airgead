@@ -14,6 +14,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspace=backend",
     "seed": "docker compose exec -T backend npm run seed",
+    "seed:delete": "docker compose exec -T backend npm run seed:delete",
     "local": "bash scripts/dev.sh"
   },
   "overrides": {

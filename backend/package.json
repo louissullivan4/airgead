@@ -13,6 +13,7 @@
     "migrate:up": "node-pg-migrate -j sql -m migrations -d DB_URL up",
     "migrate:down": "node-pg-migrate -j sql -m migrations -d DB_URL down",
     "seed": "node scripts/seed.js",
+    "seed:delete": "node scripts/seed.js --delete",
     "check:brand": "node scripts/check-brand.js"
   },
   "keywords": [],

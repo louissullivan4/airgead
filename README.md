@@ -78,6 +78,7 @@ npm run dev:frontend   # frontend only (next dev)
 # Inside the running stack:
 npm run migrate:up --workspace=backend   # apply DB migrations
 npm run seed                              # (re)seed demo data
+npm run seed:delete                       # wipe ALL data (keeps schema + migration history)
 ```
 
 Stop with `docker compose down`, or `docker compose down -v` to also wipe the database.

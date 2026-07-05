@@ -3,11 +3,10 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-equiledger}
+      POSTGRES_DB: ${POSTGRES_DB:-airgead}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      # Host port is configurable to avoid clashing with a local Postgres.
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -31,11 +30,8 @@ services:
     environment:
       PORT: 8080
       NODE_ENV: development
-      # Defaults target the postgres service above; override via backend/.env.
-      DB_URL: ${DB_URL:-postgres://postgres:postgres@postgres:5432/equiledger}
+      DB_URL: ${DB_URL:-postgres://postgres:postgres@postgres:5432/airgead}
       JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-me}
-      # Receipt images: store on the local filesystem (mounted ./backend/temp)
-      # instead of GCS. Override STORAGE_DRIVER=gcs in prod.
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       LOCAL_STORAGE_DIR: /usr/src/app/temp/receipts
       PUBLIC_BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:8080}
@@ -61,7 +57,6 @@ services:
         required: false
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
-      # Inside docker networking use the service name:
       BACKEND_URL: http://backend:8080
     depends_on:
       - backend

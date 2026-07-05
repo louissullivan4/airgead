@@ -1,29 +1,8 @@
-/*
- * Local development seed (DEMO DATA).
- *
- * Since Phase 6, MIGRATIONS are the source of truth for the schema: on an
- * empty database `npm run migrate:up` bootstraps everything (000_baseline
- * creates the pre-migration core; 001-011 evolve it exactly as on prod).
- * This script's SCHEMA_SQL is kept only as a belt-and-braces dev convenience
- * (all IF NOT EXISTS - it never fights the migrations) so `npm run seed` on a
- * blank container still works in one step.
- *
- * What you actually run it for is the DEMO DATA: a personal demo account, an
- * accountancy firm with two linked clients, and sample transactions. It is
- * idempotent - re-running wipes and recreates the demo rows (fixed UUIDs)
- * without touching anything else.
- *
- * Run it inside the backend container (bcrypt is guaranteed there):
- *     docker compose exec backend npm run seed
- * or from the host against the published port:
- *     DB_URL=postgres://postgres:postgres@localhost:5432/equiledger npm run seed
- */
-
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
 const DB_URL =
-  process.env.DB_URL || 'postgres://postgres:postgres@localhost:5432/equiledger';
+  process.env.DB_URL || 'postgres://postgres:postgres@localhost:5432/airgead';
 
 const DEMO_ORG_ID = '00000000-0000-0000-0000-0000000000a1';
 const DEMO_USER_ID = '00000000-0000-0000-0000-0000000000b1';
@@ -269,6 +248,10 @@ const DEMO_CLIENTS = [
   },
 ];
 
+// `--delete` wipes ALL application data (every table, not just seeded rows)
+// and exits without re-seeding. Schema and migration history are kept.
+const DELETE_ONLY = process.argv.includes('--delete');
+
 async function main() {
   const pool = new Pool({ connectionString: DB_URL });
   const client = await pool.connect();
@@ -276,6 +259,23 @@ async function main() {
     console.log(`Connecting to ${DB_URL.replace(/:[^:@/]*@/, ':****@')}`);
     console.log('Ensuring schema…');
     await client.query(SCHEMA_SQL);
+
+    if (DELETE_ONLY) {
+      // Discover tables at runtime so tables added by later migrations are
+      // wiped too. pgmigrations is kept so migrate:up stays a no-op.
+      const { rows } = await client.query(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'",
+      );
+      if (rows.length === 0) {
+        console.log('\n✅ No tables found - nothing to delete');
+        return;
+      }
+      const tables = rows.map((r) => `"${r.tablename}"`).join(', ');
+      await client.query(`TRUNCATE TABLE ${tables} CASCADE`);
+      console.log(`\n✅ Deleted ALL data from ${rows.length} tables:`);
+      rows.forEach((r) => console.log(`     • ${r.tablename}`));
+      return;
+    }
 
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
@@ -395,7 +395,7 @@ async function main() {
     console.log(`     email:    ${ACCT2_EMAIL}\n`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('Seed failed:', err.message);
+    console.error(DELETE_ONLY ? 'Delete failed:' : 'Seed failed:', err.message);
     process.exitCode = 1;
   } finally {
     client.release();
